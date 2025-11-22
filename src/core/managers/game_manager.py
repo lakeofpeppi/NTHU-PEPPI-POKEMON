@@ -101,11 +101,13 @@ class GameManager:
         for key, m in self.maps.items():
             block = m.to_dict()
             block["enemy_trainers"] = [t.to_dict() for t in self.enemy_trainers.get(key, [])]
+            '''
             spawn = self.player_spawns.get(key)
             block["player"] = {
                 "x": spawn["x"] / GameSettings.TILE_SIZE,
                 "y": spawn["y"] / GameSettings.TILE_SIZE
             }
+            '''
             map_blocks.append(block)
         return {
             "map": map_blocks,

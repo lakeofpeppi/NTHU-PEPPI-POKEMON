@@ -5,7 +5,8 @@ import time
 from src.scenes.scene import Scene
 from src.core import GameManager, OnlineManager
 from src.utils import Logger, PositionCamera, GameSettings, Position
-from src.core.services import sound_manager
+from src.core.services import scene_manager, sound_manager
+from src.interface.components import Button
 from src.sprites import Sprite
 from typing import override
 
@@ -13,7 +14,8 @@ class GameScene(Scene):
     game_manager: GameManager
     online_manager: OnlineManager | None
     sprite_online: Sprite
-    
+    back_button: Button
+
     def __init__(self):
         super().__init__()
         # Game Manager
@@ -29,7 +31,14 @@ class GameScene(Scene):
         else:
             self.online_manager = None
         self.sprite_online = Sprite("ingame_ui/options1.png", (GameSettings.TILE_SIZE, GameSettings.TILE_SIZE))
-        
+        px, py = GameSettings.SCREEN_WIDTH // 2, GameSettings.SCREEN_HEIGHT * 3 // 4
+        self.back_button = Button(
+            "UI/button_back.png", "UI/button_back_hover.png",
+            20, 20, 80, 80,
+            lambda: scene_manager.change_scene("menu")
+        )
+
+
         
     @override
     def enter(self) -> None:
@@ -62,7 +71,8 @@ class GameScene(Scene):
                 self.game_manager.player.position.y,
                 self.game_manager.current_map.path_name
             )
-        
+        self.back_button.update(dt)
+
     @override
     def draw(self, screen: pg.Surface):        
         if self.game_manager.player:
@@ -74,7 +84,18 @@ class GameScene(Scene):
             
             camera = self.game_manager.player.camera
             '''
-            camera = PositionCamera(16 * GameSettings.TILE_SIZE, 30 * GameSettings.TILE_SIZE)
+            #new
+            player = self.game_manager.player
+            map_surface = self.game_manager.current_map._surface  # pixel size of the whole map
+            map_w, map_h = map_surface.get_size()
+            cam_x = int(player.position.x - GameSettings.SCREEN_WIDTH  // 2)
+            cam_y = int(player.position.y - GameSettings.SCREEN_HEIGHT // 2)
+            cam_x = max(0, min(cam_x, max(0, map_w - GameSettings.SCREEN_WIDTH)))
+            cam_y = max(0, min(cam_y, max(0, map_h - GameSettings.SCREEN_HEIGHT)))
+
+            #camera = PositionCamera(16 * GameSettings.TILE_SIZE, 30 * GameSettings.TILE_SIZE)
+            camera = PositionCamera(cam_x, cam_y)
+            #player.camera = camera
             self.game_manager.current_map.draw(screen, camera)
             self.game_manager.player.draw(screen, camera)
         else:
@@ -93,3 +114,4 @@ class GameScene(Scene):
                     pos = cam.transform_position_as_position(Position(player["x"], player["y"]))
                     self.sprite_online.update_pos(pos)
                     self.sprite_online.draw(screen)
+        self.back_button.draw(screen)

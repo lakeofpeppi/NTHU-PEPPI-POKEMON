@@ -23,11 +23,18 @@ class MenuScene(Scene):
             px + 50, py, 100, 100,
             lambda: scene_manager.change_scene("game")
         )
+         #addsettings button
+        self.setting_button = Button(
+            "UI/button_setting.png", "UI/button_setting_hover.png",
+            px - 160, py, 100, 100,
+            lambda: scene_manager.change_scene("setting")
+        )
         
     @override
     def enter(self) -> None:
         sound_manager.play_bgm("RBY 101 Opening (Part 1).ogg")
-        pass
+        #pass
+
 
     @override
     def exit(self) -> None:
@@ -39,8 +46,10 @@ class MenuScene(Scene):
             scene_manager.change_scene("game")
             return
         self.play_button.update(dt)
+        self.setting_button.update(dt) 
 
     @override
     def draw(self, screen: pg.Surface) -> None:
         self.background.draw(screen)
         self.play_button.draw(screen)
+        self.setting_button.draw(screen)
