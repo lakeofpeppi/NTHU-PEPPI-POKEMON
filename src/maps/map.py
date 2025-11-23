@@ -28,6 +28,40 @@ class Map:
         self._render_all_layers(self._surface)
         # Prebake the collision map
         self._collision_map = self._create_collision_map()
+        self._bush_tiles = self._create_bush_tiles()
+
+    def _create_bush_tiles(self) -> set[tuple[int, int]]:
+        """Collect all bush tiles as (x, y) tile coordinates."""
+        bush_tiles: set[tuple[int, int]] = set()
+        for layer in self.tmxdata.visible_layers:
+            if isinstance(layer, pytmx.TiledTileLayer) and "bush" in layer.name.lower():
+                for x, y, gid in layer:
+                    if gid != 0:
+                        bush_tiles.add((x, y))
+        return bush_tiles
+    
+    def is_bush_tile(self, tile_x: int, tile_y: int) -> bool:
+        """Return True if the given tile index (tile_x, tile_y) is a bush tile."""
+        return (tile_x, tile_y) in self._bush_tiles
+
+    def is_bush_near_pixel(self, px: float, py: float, radius_tiles: int = 1) -> bool:
+        """
+        True if there is *any* bush tile within `radius_tiles` tiles
+        around the pixel position (px, py). Uses 8-neighbour check when radius=1.
+        """
+        ts = GameSettings.TILE_SIZE
+        tx = int(px // ts)
+        ty = int(py // ts)
+
+        for dx in range(-radius_tiles, radius_tiles + 1):
+            for dy in range(-radius_tiles, radius_tiles + 1):
+                # skip the center if you only care about around, not under feet
+                # if dx == 0 and dy == 0:
+                #     continue
+                if (tx + dx, ty + dy) in self._bush_tiles:
+                    return True
+        return False
+
 
     def update(self, dt: float):
         return

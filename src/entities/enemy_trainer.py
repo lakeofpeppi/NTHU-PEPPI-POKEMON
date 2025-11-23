@@ -55,8 +55,17 @@ class EnemyTrainer(Entity):
     def update(self, dt: float) -> None:
         self._movement.update(self, dt)
         self._has_los_to_player()
+        self.warning_sign.update_pos(
+            Position(
+                self.position.x + GameSettings.TILE_SIZE // 4,
+                self.position.y - GameSettings.TILE_SIZE // 2,
+            )
+        )
+
+        # if player is in front & presses SPACE, go to battle scene
         if self.detected and input_manager.key_pressed(pygame.K_SPACE):
-            pass
+            scene_manager.change_scene("battle")
+
         self.animation.update_pos(self.position)
 
     @override
@@ -85,6 +94,21 @@ class EnemyTrainer(Entity):
         '''
         TODO: Create hitbox to detect line of sight of the enemies towards the player
         '''
+        tile = GameSettings.TILE_SIZE
+        ex = int(self.position.x)
+        ey = int(self.position.y)
+
+        width = tile * 3      # detection width
+        depth = tile * 2      # detection length
+
+        if self.los_direction == Direction.UP:
+            return pygame.Rect(ex - tile, ey - depth, width, depth)
+        if self.los_direction == Direction.DOWN:
+            return pygame.Rect(ex - tile, ey + tile, width, depth)
+        if self.los_direction == Direction.LEFT:
+            return pygame.Rect(ex - depth, ey - tile, depth, width)
+        if self.los_direction == Direction.RIGHT:
+            return pygame.Rect(ex + tile, ey - tile, depth, width)
         return None
 
     def _has_los_to_player(self) -> None:
@@ -100,7 +124,15 @@ class EnemyTrainer(Entity):
         TODO: Implement line of sight detection
         If it's detected, set self.detected to True
         '''
-        self.detected = False
+        tile = GameSettings.TILE_SIZE
+        player_rect = pygame.Rect(
+            int(player.position.x),
+            int(player.position.y),
+            tile,
+            tile,
+        )
+
+        self.detected = los_rect.colliderect(player_rect)
 
     @classmethod
     @override
