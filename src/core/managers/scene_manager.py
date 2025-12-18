@@ -91,9 +91,12 @@ class SceneManager:
         self._scenes[name] = scene
 
     # NEW: optional args but old calls still work
-    def change_scene(self, scene_name: str, transition: bool = True, duration: float = 0.25) -> None:
+    def change_scene(self, scene_name: str, transition: bool = False, duration: float = 0.25) -> None:
         if scene_name not in self._scenes:
             raise ValueError(f"Scene '{scene_name}' not found")
+        self._next_scene = scene_name
+        self._use_transition = transition
+        self._transition_duration = duration
 
         # If no current scene yet, do immediate switch (prevents black screen)
         if self._current_scene is None:

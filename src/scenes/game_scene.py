@@ -266,7 +266,7 @@ class GameScene(Scene):
                 '''
             if self.game_manager.current_map.consume_bush_at_pixel(px, py):
                 from src.core.services import scene_manager
-                scene_manager.change_scene("catchpokemon", transition=True, duration=0.25)
+                scene_manager.change_scene("catchpokemon", transition=True, duration=0.5)
                 return
 
 
@@ -289,7 +289,7 @@ class GameScene(Scene):
             py = int(self.game_manager.player.position.y // ts)
 
             if self.game_manager.current_map.consume_bush_at_pixel(px, py):
-                scene_manager.change_scene("catchpokemon", transition=True, duration=0.25)
+                scene_manager.change_scene("catchpokemon", transition=True, duration=0.5)
                 return
 
         self.back_button.update(dt)

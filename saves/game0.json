@@ -7,6 +7,11 @@
           "x": 24,
           "y": 23,
           "destination": "gym.tmx"
+        },
+        {
+          "x": 54,
+          "y": 14,
+          "destination": "northpole.tmx"
         }
       ],
       "player": {
@@ -61,12 +66,37 @@
         "y": 12
       },
       "enemy_trainers": []
+    },
+    {
+      "path": "northpole.tmx",
+      "teleport": [
+        {
+          "x": 9,
+          "y": 19,
+          "destination": "map.tmx"
+        },
+        {
+          "x": 10,
+          "y": 16,
+          "destination": "map.tmx"
+        },
+        {
+          "x": 53,
+          "y": 17,
+          "destination": "map.tmx"
+        }
+      ],
+      "player": {
+        "x": 10,
+        "y": 15
+      },
+      "enemy_trainers": []
     }
   ],
   "current_map": "map.tmx",
   "player": {
-    "x": 10.969584412271,
-    "y": 30.49473739254703
+    "x": 53.64781656724445,
+    "y": 14.048642173887012
   },
   "bag": {
     "monsters": [
