@@ -34,6 +34,8 @@ class Engine:
         [TODO HACKATHON 5]
         Register the setting scene here
         '''
+        game_scene = GameScene()
+        scene_manager.register_scene("game", game_scene)
         scene_manager.register_scene("setting", SettingScene()) 
         scene_manager.change_scene("menu")
         scene_manager.register_scene("battle", BattleScene())

@@ -43,6 +43,21 @@ class Map:
     def is_bush_tile(self, tile_x: int, tile_y: int) -> bool:
         """Return True if the given tile index (tile_x, tile_y) is a bush tile."""
         return (tile_x, tile_y) in self._bush_tiles
+    
+    def consume_bush_at_pixel(self, px: float, py: float) -> bool:
+        """
+        If (px, py) is on a bush tile that is still active,
+        remove that bush from the set and return True.
+
+        Otherwise return False.
+        """
+        ts = GameSettings.TILE_SIZE
+        tile = (int(px // ts), int(py // ts))
+        if tile in self._bush_tiles:
+            self._bush_tiles.remove(tile)   # bush can no longer be used
+            return True
+        return False
+
 
     def is_bush_near_pixel(self, px: float, py: float, radius_tiles: int = 1) -> bool:
         """

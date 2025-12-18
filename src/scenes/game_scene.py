@@ -31,6 +31,7 @@ class GameScene(Scene):
 
     def __init__(self):
         super().__init__()
+        self.in_bush = False 
         # Game Manager
         manager = GameManager.load("saves/game0.json")
         if manager is None:
@@ -185,6 +186,29 @@ class GameScene(Scene):
             self.backpack_back_button.update(dt)
             return
         
+        if self.game_manager.player:
+            px = self.game_manager.player.position.x
+            py = self.game_manager.player.position.y
+
+            '''
+            on_bush = self.game_manager.current_map.is_bush_tile(px, py)
+
+            # player just stepped ON a bush tile this frame
+            if on_bush and not self.in_bush:
+                self.in_bush = True
+                scene_manager.change_scene("catchpokemon")
+                return  # stop updating after scene switch
+
+            # player is NOT on a bush tile anymore
+            elif not on_bush:
+                self.in_bush = False
+                '''
+            if self.game_manager.current_map.consume_bush_at_pixel(px, py):
+                from src.core.services import scene_manager
+                scene_manager.change_scene("catchpokemon")
+                return
+
+
         # Check if there is assigned next scene
         self.game_manager.try_switch_map()
         
@@ -204,8 +228,8 @@ class GameScene(Scene):
             py = int(self.game_manager.player.position.y // ts)
 
             from src.core.services import input_manager  # at top of file you probably already import this elsewhere
-            if (self.game_manager.current_map.is_bush_tile(px, py)
-                    and input_manager.key_pressed(pg.K_e)):
+            if self.game_manager.current_map.is_bush_tile(px, py):
+                    #and input_manager.key_pressed(pg.K_e)):
                 # go to catch-pokemon scene
                 from src.core.services import scene_manager
                 scene_manager.change_scene("catchpokemon")

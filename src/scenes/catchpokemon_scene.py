@@ -1,94 +1,140 @@
+from __future__ import annotations
+
+import random
 import pygame as pg
+from typing import override
 
 from src.scenes.scene import Scene
-from src.core import GameManager
-from src.core.services import scene_manager
-from src.utils import GameSettings
 from src.sprites import Sprite
 from src.interface.components import Button
-
-from typing import override
+from src.core.services import scene_manager, sound_manager
+from src.utils import GameSettings
+from src.sprites import BackgroundSprite, Sprite
 
 
 class CatchPokemonScene(Scene):
     """
-    Simple scene: same background style as battle,
-    shows a 'Catch Pokemon' button and 'Run' button.
-    On catch, adds a monster to the bag and returns to game.
+    Simple scene shown after colliding with a bush.
+
+    - Same background as battle scene.
+    - Two buttons: 'Catch Pokemon' and 'Run'.
+    - On catch: add a new monster to the Bag used in GameScene, then go back.
     """
 
     def __init__(self) -> None:
         super().__init__()
 
-        # TODO: replace BATTLE_BACKGROUND.png with your real battle bg path
-        self.background = Sprite("backgrounds/background2.png",
-                                 (GameSettings.SCREEN_WIDTH,
-                                  GameSettings.SCREEN_HEIGHT))
+        # same background style as battle_scene
+        self.background = BackgroundSprite("backgrounds/background2.png")
+        self.pokemon = Sprite("menu_sprites/menusprite4.png", (300,300))
+        self.pokemon.rect.center = (
+            GameSettings.SCREEN_WIDTH // 2,
+            GameSettings.SCREEN_HEIGHT // 2 - 50
+        
+        )
+        self.pokemon.rect.midbottom = (
+        GameSettings.SCREEN_WIDTH // 2,
+    GameSettings.SCREEN_HEIGHT // 2 + 50
+)
 
-        # Press Start 2P font you installed earlier
-        # Put PressStart2P.ttf in assets/fonts/PressStart2P.ttf
+
+        # pixel font (fallback to default if file missing)
         try:
-            self.font = pg.font.Font("fonts/PressStart2P.ttf", 24)
+            self.font = pg.font.Font("assets/fonts/Minecraft.ttf", 24)
         except FileNotFoundError:
-            self.font = pg.font.Font(None, 24)   # fallback
+            self.font = pg.font.Font(None, 24)
 
-        # Buttons at bottom center
-        btn_w, btn_h = 220, 60
-        center_x = GameSettings.SCREEN_WIDTH // 2
-        bottom_y = GameSettings.SCREEN_HEIGHT - 100
+        # monster that will be added to the bag if player chooses "Catch"
+        self.monster_data = self._generate_monster()
 
-        # TODO: replace BUTTON_NORMAL.png / BUTTON_HOVER.png with your own
+        # ---- button geometry (we store rects ourselves; NO Button.rect needed) ----
+        btn_w, btn_h = 220, 64
+        cx = GameSettings.SCREEN_WIDTH // 2
+        y = GameSettings.SCREEN_HEIGHT - 120
+
+        self.catch_btn_rect = pg.Rect(cx - btn_w - 20, y, btn_w, btn_h)
+        self.run_btn_rect   = pg.Rect(cx + 20,        y, btn_w, btn_h)
+
+        # NOTE: replace these PNG paths with your own button assets if you want
         self.catch_button = Button(
-            "UI/raw/UI_Flat_Button02a_3.png", "UI/raw/UI_Flat_Button02a_1.png",
-            center_x - btn_w - 20, bottom_y, btn_w, btn_h,
-            self._on_catch
+            "UI/raw/UI_Flat_Button02a_4.png", "UI/raw/UI_Flat_Button02a_1.png",
+            self.catch_btn_rect.x, self.catch_btn_rect.y,
+            self.catch_btn_rect.width, self.catch_btn_rect.height,
+            self._on_catch,
         )
+        '''
         self.run_button = Button(
-            "UI/raw/UI_Flat_Button02a_3.png", "UI/raw/UI_Flat_Button02a_1.png",
-            center_x + 20, bottom_y, btn_w, btn_h,
-            self._on_run
+            "UI/raw/UI_Flat_Button02a_4.png", "UI/raw/UI_Flat_Button02a_1.png",
+            self.run_btn_rect.x, self.run_btn_rect.y,
+            self.run_btn_rect.width, self.run_btn_rect.height,
+            self._on_run,
+        )
+        '''
+        self.run_button = Button(
+            "UI/raw/UI_Flat_Button02a_4.png", "UI/raw/UI_Flat_Button02a_1.png",
+            self.run_btn_rect.x, self.run_btn_rect.y,
+            self.run_btn_rect.width, self.run_btn_rect.height,
+            lambda: scene_manager.change_scene("game", transition=True, duration=0.25)
         )
 
-        # hard-coded monster info (you can change later)
-        self.mon_name = "Bushmon"
-        self.mon_level = 5
-        self.mon_hp = 50
-        self.mon_max_hp = 50
-       
-        self.mon_sprite_path = "menu_sprites/menusprite10.png"
 
-    # ------------- callbacks -------------
+    # ------------------------------------------------------------------ helpers --
 
-    def _on_catch(self) -> None:
-        """
-        Add new monster to bag & save to file,
-        then return to game scene.
-        """
-        gm = GameManager.load("saves/game0.json")
-        if gm is None:
-            # if something goes wrong, just go back
-            scene_manager.change_scene("game")
-            return
-
-        new_mon = {
-            "name": self.mon_name,
-            "hp": self.mon_hp,
-            "max_hp": self.mon_max_hp,
-            "level": self.mon_level,
-            "sprite_path": self.mon_sprite_path,
+    def _generate_monster(self) -> dict:
+        """Create a simple bush monster; tweak however you like."""
+        lvl = random.randint(3, 7)
+        max_hp = 60 + 5 * lvl
+        return {
+            "name": "Bushmon",
+            "level": lvl,
+            "hp": max_hp,
+            "max_hp": max_hp,
+            "sprite_path": "menu_sprites/menusprite15.png",
         }
 
-        # Bag is a Bag() instance; we use its method
-        gm.bag.add_monster(new_mon)
-        gm.save("saves/game0.json")
+    def _add_monster_to_bag(self) -> None:
+        """
+        Append the new monster into the SAME Bag instance that GameScene uses.
 
-        scene_manager.change_scene("game")
+        We grab the 'game' scene out of SceneManager's scene dictionary and
+        touch its game_manager.bag directly, so the Backpack overlay updates
+        immediately.
+        """
+        scenes = getattr(scene_manager, "_scenes", {})
+        game_scene = scenes.get("game")
 
+        if game_scene is None or not hasattr(game_scene, "game_manager"):
+            # fail-safe: nothing to do
+            return
+
+        bag = game_scene.game_manager.bag
+
+        # Bag may expose different APIs; try them in order.
+        if hasattr(bag, "add_monster"):
+            bag.add_monster(self.monster_data)
+        elif hasattr(bag, "monsters"):
+            bag.monsters.append(self.monster_data)
+        elif hasattr(bag, "_monsters_data"):
+            bag._monsters_data.append(self.monster_data)
+
+    # ---------------------------------------------------------- button callbacks --
+
+    def _on_catch(self) -> None:
+        self._add_monster_to_bag()
+        # optional SFX – change to your own
+        try:
+            sound_manager.play_sound("SFX/CATCH_SUCCESS.ogg", 0.7)
+        except Exception:
+            pass
+        scene_manager.change_scene("game", transition=True, duration=0.25)
+
+
+    '''
     def _on_run(self) -> None:
-        """Just go back without catching."""
-        scene_manager.change_scene("game")
 
-    # ------------- Scene API -------------
+        scene_manager.change_scene("game")
+    '''
+    # --------------------------------------------------------------- Scene API ----
 
     @override
     def update(self, dt: float) -> None:
@@ -97,39 +143,46 @@ class CatchPokemonScene(Scene):
 
     @override
     def draw(self, screen: pg.Surface) -> None:
+        # background
         self.background.draw(screen)
+        self.pokemon.draw(screen)
 
-        # text: "A wild Bushmon appeared! Catch?"
-        title = f"A wild {self.mon_name} appeared!"
-        subtitle = "Catch this Pokémon?"
-        title_surf = self.font.render(title, True, (0, 0, 0))
-        subtitle_surf = self.font.render(subtitle, True, (0, 0, 0))
+        # title & message
+        title = self.font.render("Wild Pokemon found!", True, (0, 0, 0))
+        msg   = self.font.render("Catch this Pokemon?", True, (0, 0, 0))
 
         screen.blit(
-            title_surf,
-            (GameSettings.SCREEN_WIDTH // 2 - title_surf.get_width() // 2,
-             40),
+            title,
+            (GameSettings.SCREEN_WIDTH // 2 - title.get_width() // 2, 40),
         )
         screen.blit(
-            subtitle_surf,
-            (GameSettings.SCREEN_WIDTH // 2 - subtitle_surf.get_width() // 2,
-             80),
+            msg,
+            (GameSettings.SCREEN_WIDTH // 2 - msg.get_width() // 2, 100),
         )
 
-        # draw buttons with labels
+        # draw buttons
         self.catch_button.draw(screen)
         self.run_button.draw(screen)
 
-        catch_label = self.font.render("Catch Pokémon", True, (0, 0, 0))
-        run_label = self.font.render("Run", True, (0, 0, 0))
+        # button labels (centered using our own rects)
+        catch_label = self.font.render("Catch Pokemon", True, (0, 0, 0))
+        run_label   = self.font.render("Run", True, (0, 0, 0))
 
         screen.blit(
             catch_label,
-            (self.catch_button.rect.centerx - catch_label.get_width() // 2,
-             self.catch_button.rect.centery - catch_label.get_height() // 2),
+            (
+                self.catch_btn_rect.x
+                + (self.catch_btn_rect.width - catch_label.get_width()) // 2,
+                self.catch_btn_rect.y
+                + (self.catch_btn_rect.height - catch_label.get_height()) // 2 - 60,
+            ),
         )
         screen.blit(
             run_label,
-            (self.run_button.rect.centerx - run_label.get_width() // 2,
-             self.run_button.rect.centery - run_label.get_height() // 2),
+            (
+                self.run_btn_rect.x
+                + (self.run_btn_rect.width - run_label.get_width()) // 2,
+                self.run_btn_rect.y
+                + (self.run_btn_rect.height - run_label.get_height()) // 2 - 60 ,
+            ),
         )
