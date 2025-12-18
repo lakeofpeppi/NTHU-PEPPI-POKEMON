@@ -123,7 +123,40 @@ class GameScene(Scene):
             self._close_backpack
         )
 
-        self.bag_font = pg.font.Font("assets/fonts/Minecraft.ttf", 18)
+        
+
+        # Backpack UI assets
+        self.bag_title_font = pg.font.Font("assets/fonts/Minecraft.ttf", 22)
+        self.bag_font = pg.font.Font("assets/fonts/Minecraft.ttf", 14)
+        self.bag_small_font = pg.font.Font("assets/fonts/Minecraft.ttf", 10)
+
+        # Panel geometry (reuse in update/draw)
+        self.bag_panel_w, self.bag_panel_h = 760, 430
+        self.bag_panel_x = (GameSettings.SCREEN_WIDTH  - self.bag_panel_w) // 2
+        self.bag_panel_y = (GameSettings.SCREEN_HEIGHT - self.bag_panel_h) // 2
+
+        # Load banner image for monster cards
+        self.mon_banner_img = pg.image.load("assets/images/UI/raw/UI_Flat_Banner03a.png").convert_alpha()
+
+
+        # Close button (top-right of panel)
+        x_size = 48
+        x_x = self.bag_panel_x + self.bag_panel_w - x_size - 14
+        x_y = self.bag_panel_y + 14
+        self.backpack_close_button = Button(
+            "UI/button_x.png", "UI/button_x_hover.png",
+            x_x, x_y, x_size, x_size,
+            self._close_backpack
+        )
+
+        # Optional: map item names -> options icons (fallback to item['sprite_path'])
+        self.item_icon_map = {
+            "Potion": "ingame_ui/potion.png",
+            "Coins": "ingame_ui/coin.png",
+            "Pokeball": "ingame_ui/ball.png",
+        }
+
+
 
         # ----------- NEW: bush / catch button -----------
         self.near_bush = False
@@ -143,6 +176,34 @@ class GameScene(Scene):
         self.catch_button.rect = pg.Rect(
             catch_x, catch_y, catch_w, catch_h
             )
+        
+                # ----------- Wild pokemon pool for bushes -----------
+        # You can tweak these or load them from JSON later
+        self.wild_pokemon_pool = [
+            {
+                "name": "Bushmon",
+                "base_hp": 50,
+                "min_level": 2,
+                "max_level": 5,
+                "sprite_path": "menu_sprites/menusprite3.png",
+            },
+            {
+                "name": "Leafy",
+                "base_hp": 60,
+                "min_level": 3,
+                "max_level": 7,
+                "sprite_path": "menu_sprites/menusprite4.png",
+            },
+            {
+                "name": "Stoneling",
+                "base_hp": 80,
+                "min_level": 4,
+                "max_level": 8,
+                "sprite_path": "menu_sprites/menusprite5.png",
+            },
+        ]
+        # ----------------------------------------------------
+
         # ------------------------------------------------
 
     # ------------ open/close overlays -----------------
@@ -183,7 +244,7 @@ class GameScene(Scene):
             return
 
         if self.backpack_open:
-            self.backpack_back_button.update(dt)
+            self.backpack_close_button.update(dt)
             return
         
         if self.game_manager.player:
@@ -205,7 +266,7 @@ class GameScene(Scene):
                 '''
             if self.game_manager.current_map.consume_bush_at_pixel(px, py):
                 from src.core.services import scene_manager
-                scene_manager.change_scene("catchpokemon")
+                scene_manager.change_scene("catchpokemon", transition=True, duration=0.25)
                 return
 
 
@@ -227,12 +288,8 @@ class GameScene(Scene):
             px = int(self.game_manager.player.position.x // ts)
             py = int(self.game_manager.player.position.y // ts)
 
-            from src.core.services import input_manager  # at top of file you probably already import this elsewhere
-            if self.game_manager.current_map.is_bush_tile(px, py):
-                    #and input_manager.key_pressed(pg.K_e)):
-                # go to catch-pokemon scene
-                from src.core.services import scene_manager
-                scene_manager.change_scene("catchpokemon")
+            if self.game_manager.current_map.consume_bush_at_pixel(px, py):
+                scene_manager.change_scene("catchpokemon", transition=True, duration=0.25)
                 return
 
         self.back_button.update(dt)
@@ -350,59 +407,132 @@ class GameScene(Scene):
     # ---------------- BACKPACK overlay (unchanged) ------------------
 
     def _draw_backpack_overlay(self, screen: pg.Surface) -> None:
-        # darken background
-        dim = pg.Surface(
-            (GameSettings.SCREEN_WIDTH, GameSettings.SCREEN_HEIGHT),
-            pg.SRCALPHA
-        )
-        dim.fill((0, 0, 0, 150))
+    # darken background
+        dim = pg.Surface((GameSettings.SCREEN_WIDTH, GameSettings.SCREEN_HEIGHT), pg.SRCALPHA)
+        dim.fill((0, 0, 0, 140))
         screen.blit(dim, (0, 0))
 
-        # center panel
-        panel_w, panel_h = 640, 360
-        panel_x = (GameSettings.SCREEN_WIDTH  - panel_w) // 2
-        panel_y = (GameSettings.SCREEN_HEIGHT - panel_h) // 2
-        panel_rect = pg.Rect(panel_x, panel_y, panel_w, panel_h)
+        # panel
+        x = self.bag_panel_x
+        y = self.bag_panel_y
+        w = self.bag_panel_w
+        h = self.bag_panel_h
+        panel = pg.Rect(x, y, w, h)
 
-        pg.draw.rect(screen, (240, 240, 240), panel_rect)
-        pg.draw.rect(screen, (0, 0, 0), panel_rect, 3)
+        # background like "bag"
+        pg.draw.rect(screen, (235, 160, 70), panel, border_radius=10)
+        pg.draw.rect(screen, (60, 35, 20), panel, 4, border_radius=10)
 
         # title
-        title_surf = self.bag_font.render("Backpack", True, (0, 0, 0))
-        screen.blit(
-            title_surf,
-            (panel_x + (panel_w - title_surf.get_width()) // 2, panel_y + 10)
-        )
+        title = self.bag_title_font.render("BAG", True, (40, 20, 10))
+        screen.blit(title, (x + 18, y + 14))
 
-        # column labels
-        monsters_label = self.bag_font.render("Monsters", True, (0, 0, 0))
-        items_label    = self.bag_font.render("Items", True, (0, 0, 0))
+        # close button (top-right)
+        self.backpack_close_button.draw(screen)
 
-        monsters_x = panel_x + 20
-        items_x    = panel_x + panel_w // 2 + 20
-        header_y   = panel_y + 50
+        # layout areas
+        left_x = x + 22
+        top_y = y + 70
+        left_w = int(w * 0.55)
+        right_x = x + left_w + 28
+        right_w = w - (right_x - x) - 22
 
-        screen.blit(monsters_label, (monsters_x, header_y))
-        screen.blit(items_label,    (items_x,    header_y))
+        # headers
+        monsters_label = self.bag_font.render("Monsters", True, (40, 20, 10))
+        items_label = self.bag_font.render("Items", True, (40, 20, 10))
+        screen.blit(monsters_label, (left_x, top_y - 28))
+        screen.blit(items_label, (right_x, top_y - 28))
 
-        # ---- list monsters (uses data from save/load) ----
-        y = header_y + 30
-        for mon in self.game_manager.bag._monsters_data:
-            line = f"{mon['name']} Lv{mon['level']} HP {mon['hp']}/{mon['max_hp']}"
-            text_surf = self.bag_font.render(line, True, (0, 0, 0))
-            screen.blit(text_surf, (monsters_x, y))
-            y += 24
+        # -------- LEFT: monster cards with banner --------
+        card_h = 70
+        card_gap = 12
+        cur_y = top_y
 
-        # ---- list items ----
-        y = header_y + 30
-        for item in self.game_manager.bag._items_data:
-            line = f"{item['name']} x{item['count']}"
-            text_surf = self.bag_font.render(line, True, (0, 0, 0))
-            screen.blit(text_surf, (items_x, y))
-            y += 24
+        #removethis
+        #print(pg.image.load("assets/images/UI/button_x.png"))
 
-        # back button inside overlay
-        self.backpack_back_button.draw(screen)
+        monsters = getattr(self.game_manager.bag, "_monsters_data", [])
+        for mon in monsters[:4]:  # show up to 4 (avoid overflow)
+            # banner scaled to fit card area
+            banner_w = left_w - 20
+            banner_h = card_h
+            banner = pg.transform.scale(self.mon_banner_img, (banner_w, banner_h))
+            screen.blit(banner, (left_x, cur_y))
+
+            # monster sprite
+            spr_path = "assets/images/" + mon.get("sprite_path", "")
+            try:
+                
+                spr = pg.image.load(spr_path).convert_alpha()
+                SPR_SIZE = 52
+                spr = pg.transform.scale(spr, (SPR_SIZE, SPR_SIZE))
+
+
+                spr_x = left_x + 20
+                spr_y = cur_y - 3 
+                screen.blit(spr, (spr_x, spr_y))
+            except Exception as e:
+                print("Failed to load monster sprite:", spr_path, e)
+
+            # name + level
+            name = mon.get("name", "Unknown")
+            lvl = mon.get("level", 1)
+            hp = mon.get("hp", 0)
+            max_hp = mon.get("max_hp", 1)
+
+            name_s = self.bag_font.render(f"{name}", True, (20, 20, 20))
+            lvl_s = self.bag_small_font.render(f"Lv{lvl}", True, (20, 20, 20))
+            screen.blit(name_s, (left_x + 82, cur_y + 10))
+            screen.blit(lvl_s, (left_x + banner_w - 52, cur_y + 12))
+
+            # HP bar
+            bar_x = left_x + 80
+            bar_y = cur_y + 30
+            bar_w = banner_w - 110
+            bar_h = 8
+
+            pg.draw.rect(screen, (60, 60, 60), (bar_x, bar_y, bar_w, bar_h), border_radius=4)
+            ratio = 0.0 if max_hp <= 0 else max(0.0, min(1.0, hp / max_hp))
+            fill_w = int(bar_w * ratio)
+            pg.draw.rect(screen, (70, 200, 90), (bar_x, bar_y, fill_w, bar_h), border_radius=4)
+
+            hp_s = self.bag_small_font.render(f"HP {hp}/{max_hp}", True, (20, 20, 20))
+            screen.blit(hp_s, (bar_x, bar_y + 11))
+
+            cur_y += card_h + card_gap
+
+        # -------- RIGHT: item list with icons --------
+        items = getattr(self.game_manager.bag, "_items_data", [])
+        row_h = 46
+        cur_y = top_y
+
+        for it in items[:7]:
+            name = it.get("name", "Item")
+            count = it.get("count", 0)
+
+            icon_rel = it.get("sprite_path") or self.item_icon_map.get(name, "")
+            icon_path = "assets/images/" + icon_rel
+
+            try:
+                icon = pg.image.load(icon_path).convert_alpha()
+                ICON_SIZE = 38   # try 44 or 48
+
+                icon = pg.transform.scale(icon, (ICON_SIZE, ICON_SIZE))
+                screen.blit(icon, (right_x, cur_y + (row_h - ICON_SIZE)//2))
+
+            except Exception as e:
+                print("Failed to load item icon:", icon_path, e)
+
+                
+
+            name_s = self.bag_font.render(name, True, (40, 20, 10))
+            cnt_s = self.bag_font.render(f"x{count}", True, (40, 20, 10))
+
+            screen.blit(name_s, (right_x + 44, cur_y + 10))
+            screen.blit(cnt_s, (right_x + right_w - cnt_s.get_width() - 10, cur_y + 10))
+
+            cur_y += row_h
+
 
     # ---------------- save / load helpers ------------------
 
@@ -421,26 +551,33 @@ class GameScene(Scene):
     def _catch_pokemon(self) -> None:
         """
         Called when the 'Catch Pokemon' button is clicked while standing on a bush.
-        For now we just create a simple monster and insert it into the bag.
-        You can replace the stats/sprite_path with your real monsters.
+        Now: randomly picks a wild pokemon from self.wild_pokemon_pool.
         """
         if not self.near_bush:
             return
 
-        # simple fake monster – replace with your own design later
+        # Pick a random pokemon template from the pool
+        template = random.choice(self.wild_pokemon_pool)
+
+        # Randomize its level in the given range
+        level = random.randint(template["min_level"], template["max_level"])
+
+        # Simple scaling for HP based on level (you can change this formula)
+        max_hp = template["base_hp"] + (level - 1) * 5
+
         new_mon = {
-            "name": "Bushmon",
-            "hp": 60,
-            "max_hp": 60,
-            "level": random.randint(3, 7),
-            "sprite_path": "menu_sprites/menusprite1.png"
+            "name": template["name"],
+            "hp": max_hp,
+            "max_hp": max_hp,
+            "level": level,
+            "sprite_path": template["sprite_path"],
         }
 
         self.game_manager.bag._monsters_data.append(new_mon)
-        Logger.info(f"Caught a wild {new_mon['name']}!")
+        Logger.info(f"Caught a wild {new_mon['name']}! Lv{new_mon['level']}")
 
         # optional SFX if you have one
         try:
             sound_manager.play_sound("SFX/POKEBALL_CAPTURE.wav", volume=0.7)
         except Exception:
-            pass  # ignore if the sound file doesn't exist
+            pass

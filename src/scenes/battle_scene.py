@@ -4,7 +4,7 @@ from src.scenes.scene import Scene
 from src.core.services import scene_manager, input_manager
 from src.utils import GameSettings
 from typing import override
-from src.sprites import BackgroundSprite
+from src.sprites import BackgroundSprite, Sprite
 
 
 class BattleScene(Scene):
@@ -23,6 +23,18 @@ class BattleScene(Scene):
     def __init__(self) -> None:
         super().__init__()
         self.background = BackgroundSprite("backgrounds/background2.png")
+        self.personal = Sprite("menu_sprites/menusprite16.png", (350,350))
+        self.personal.rect.center = (
+            GameSettings.SCREEN_WIDTH // 2 - 450,
+            GameSettings.SCREEN_HEIGHT // 2 + 30
+        
+        )
+        self.enemy = Sprite("menu_sprites/menusprite11.png", (400,400))
+        self.enemy.rect.center = (
+            GameSettings.SCREEN_WIDTH // 2 + 450,
+            GameSettings.SCREEN_HEIGHT // 2 - 200
+        
+        )
         # Basic stats
         self.player_max_hp = 50
         self.player_hp = 50
@@ -88,35 +100,42 @@ class BattleScene(Scene):
     @override
     def draw(self, screen: pg.Surface) -> None:
         w, h = GameSettings.SCREEN_WIDTH, GameSettings.SCREEN_HEIGHT
-
+        
         # Background
         self.background.draw(screen)
         # --- Enemy HP bar (top-right) ---
+        
         bar_w, bar_h = 200, 20
         enemy_x = w - bar_w - 60
         enemy_y = 40
-        pg.draw.rect(screen, (0, 0, 0), (enemy_x, enemy_y, bar_w, bar_h), 2)
+        #pg.draw.rect(screen, (0, 0, 0), (enemy_x, enemy_y, bar_w, bar_h), 2)
         enemy_ratio = self.enemy_hp / self.enemy_max_hp
+        '''
         pg.draw.rect(
             screen,
             (200, 0, 0),
             (enemy_x + 2, enemy_y + 2, int((bar_w - 4) * enemy_ratio), bar_h - 4),
         )
+        '''
         enemy_text = self.font_small.render(
             f"Enemy HP: {self.enemy_hp}/{self.enemy_max_hp}", True, (0, 0, 0)
         )
         screen.blit(enemy_text, (enemy_x, enemy_y - 25))
 
         # --- Player HP bar (bottom-left) ---
+        self.personal.draw(screen)
+        self.enemy.draw(screen)
         player_x = 60
         player_y = h - 120
-        pg.draw.rect(screen, (0, 0, 0), (player_x, player_y, bar_w, bar_h), 2)
+        #pg.draw.rect(screen, (0, 0, 0), (player_x, player_y, bar_w, bar_h), 2)
         player_ratio = self.player_hp / self.player_max_hp
+        '''
         pg.draw.rect(
             screen,
             (0, 180, 60),
             (player_x + 2, player_y + 2, int((bar_w - 4) * player_ratio), bar_h - 4),
         )
+        '''
         player_text = self.font_small.render(
             f"Player HP: {self.player_hp}/{self.player_max_hp}", True, (0, 0, 0)
         )
@@ -124,9 +143,9 @@ class BattleScene(Scene):
 
         # --- Placeholder monsters (replace with sprites later) ---
         # PLAYER_MONSTER
-        pg.draw.rect(screen, (40, 140, 40), (120, h - 260, 96, 96))
+        #pg.draw.rect(screen, (40, 140, 40), (120, h - 260, 96, 96))
         # ENEMY_MONSTER
-        pg.draw.rect(screen, (140, 40, 40), (w - 220, 140, 96, 96))
+        #pg.draw.rect(screen, (140, 40, 40), (w - 220, 140, 96, 96))
 
         # --- Bottom message box / options ---
         box_h = 100
