@@ -1,12 +1,19 @@
 import threading
 import time
-import copy
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict
 
 TIMEOUT_TIME = 60.0
 CHECK_INTERVAL_TIME = 10.0
 
+"""
+TODO:
+In this file, you'll probably need to add more parameters for the direction change of other players.
+We recommend you not change any part unless there is a 'HINT' above it.
+"""
+
+# HINT: This class is used to store player information. Since you'll probably need to deal with direction, etc.
+# You can add other parameters if you need to.
 @dataclass
 class Player:
     id: int
@@ -15,6 +22,8 @@ class Player:
     map: str
     last_update: float
 
+    # HINT: This part might be helpful for direction change
+    # Maybe you can add other parameters? 
     def update(self, x: float, y: float, map: str) -> None:
         if x != self.x or y != self.y or map != self.map:
             self.last_update = time.monotonic()
@@ -35,7 +44,7 @@ class PlayerHandler:
     players: Dict[int, Player]
     _next_id: int
 
-    def __init__(self, *, timeout_seconds: float = 120.0, check_interval_seconds: float = 5.0):
+    def __init__(self):
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._thread = None
@@ -72,8 +81,18 @@ class PlayerHandler:
         with self._lock:
             pid = self._next_id
             self._next_id += 1
+            # HINT: This part might be helpful for direction change
+            # Maybe you can add other parameters? 
             self.players[pid] = Player(pid, 0.0, 0.0, "", time.monotonic())
             return pid
+
+    def unregister(self, pid: int) -> bool:
+        """Remove a player from the system"""
+        with self._lock:
+            if pid in self.players:
+                del self.players[pid]
+                return True
+            return False
 
     def update(self, pid: int, x: float, y: float, map_name: str) -> bool:
         with self._lock:
@@ -81,6 +100,8 @@ class PlayerHandler:
             if not p:
                 return False
             else:
+                # HINT: This part might be helpful for direction change
+                # Maybe you can add other parameters? 
                 p.update(float(x), float(y), str(map_name))
                 return True
 
@@ -88,6 +109,8 @@ class PlayerHandler:
         with self._lock:
             player_list = {}
             for p in self.players.values():
+                # HINT: This part might be helpful for direction change
+                # Maybe you can add other parameters? 
                 player_list[p.id] = {
                     "id": p.id,
                     "x": p.x,

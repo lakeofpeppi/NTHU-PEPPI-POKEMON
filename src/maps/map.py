@@ -166,3 +166,4 @@ class Map:
                 "y": self.spawn.y // GameSettings.TILE_SIZE,
             }
         }
+

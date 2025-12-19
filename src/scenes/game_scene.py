@@ -2,7 +2,8 @@ import pygame as pg
 import threading
 import time
 import random
-
+from src.entities.shop_npc import ShopNPC
+from src.utils import Direction
 from src.scenes.scene import Scene
 from src.core import GameManager, OnlineManager
 from src.utils import Logger, PositionCamera, GameSettings, Position
@@ -38,6 +39,54 @@ class GameScene(Scene):
             Logger.error("Failed to load game manager")
             exit(1)
         self.game_manager = manager
+
+
+
+        # -------- MINIMAP --------
+        self.minimap_w = 180
+        self.minimap_h = 180
+        self.minimap_x = 20
+        self.minimap_y = 110   # below your back button (back button is at y=20)
+
+        self._minimap_cached = None
+        self._minimap_cached_key = None  # cache per-map
+        # ------------------------- SHOP -------
+        self.shop_open = False
+        self.shop_tab = "buy"  # "buy" or "sell"
+        self.shop_font = pg.font.Font("assets/fonts/Minecraft.ttf", 18)
+        self.shop_small_font = pg.font.Font("assets/fonts/Minecraft.ttf", 14)
+
+        # NPC world position (PIXELS) - adjust to where you want the NPC to stand
+        ts = GameSettings.TILE_SIZE
+        self.shop_npc = ShopNPC(
+            x=18 * ts,
+            y=8 * ts,
+            game_manager=self.game_manager,
+            facing=Direction.DOWN
+        )
+        # shop items + prices
+        self.shop_inventory = [
+            {"name": "Potion",   "price": 5,  "sprite_path": "ingame_ui/potion.png"},
+            {"name": "Pokeball", "price": 10, "sprite_path": "ingame_ui/ball.png"},
+            {"name": "Rare Candy","price": 50, "sprite_path": "ingame_ui/potion.png"},  # replace sprite if you have
+            {"name": "Max Potion","price": 30, "sprite_path": "ingame_ui/potion.png"},
+        ]
+
+        # overlay layout
+        self.shop_panel_w, self.shop_panel_h = 760, 430
+        self.shop_panel_x = (GameSettings.SCREEN_WIDTH - self.shop_panel_w) // 2
+        self.shop_panel_y = (GameSettings.SCREEN_HEIGHT - self.shop_panel_h) // 2
+
+        # tab buttons + close
+        tab_w, tab_h = 120, 44
+        self.shop_buy_tab_rect = pg.Rect(self.shop_panel_x + 30, self.shop_panel_y + 20, tab_w, tab_h)
+        self.shop_sell_tab_rect = pg.Rect(self.shop_panel_x + 30 + tab_w + 16, self.shop_panel_y + 20, tab_w, tab_h)
+        self.shop_close_rect = pg.Rect(self.shop_panel_x + self.shop_panel_w - 56, self.shop_panel_y + 18, 40, 40)
+
+        # click debounce
+        self._mouse_prev = False
+        self._space_prev = False
+
         
         # Online Manager
         if GameSettings.IS_ONLINE:
@@ -46,12 +95,7 @@ class GameScene(Scene):
             self.online_manager = None
         self.sprite_online = Sprite("ingame_ui/options1.png", (GameSettings.TILE_SIZE, GameSettings.TILE_SIZE))
 
-        # Back to menu
-        self.back_button = Button(
-            "UI/button_back.png", "UI/button_back_hover.png",
-            20, 20, 80, 80,
-            lambda: scene_manager.change_scene("menu")
-        )
+        #
 
         # overlay button (settings)
         btn_w, btn_h = 80, 80
@@ -63,6 +107,14 @@ class GameScene(Scene):
             self._open_overlay
         )
 
+        #Back to menu
+        back_x = open_x
+        back_y = open_y + (btn_h*2)+ 20
+        self.back_button = Button(
+            "UI/button_back.png", "UI/button_back_hover.png",
+            back_x, back_y, 80, 80,
+            lambda: scene_manager.change_scene("menu")
+        )
         cx = GameSettings.SCREEN_WIDTH // 2
         cy = GameSettings.SCREEN_HEIGHT // 2
 
@@ -123,8 +175,6 @@ class GameScene(Scene):
             self._close_backpack
         )
 
-        
-
         # Backpack UI assets
         self.bag_title_font = pg.font.Font("assets/fonts/Minecraft.ttf", 22)
         self.bag_font = pg.font.Font("assets/fonts/Minecraft.ttf", 14)
@@ -157,8 +207,7 @@ class GameScene(Scene):
         }
 
 
-
-        # ----------- NEW: bush / catch button -----------
+        # -----------  bush / catch button -----------
         self.near_bush = False
         self.catch_font = pg.font.Font("assets/fonts/Minecraft.ttf", 20)
 
@@ -178,7 +227,6 @@ class GameScene(Scene):
             )
         
                 # ----------- Wild pokemon pool for bushes -----------
-        # You can tweak these or load them from JSON later
         self.wild_pokemon_pool = [
             {"name": "Bushmon",      "base_hp": 60, "min_level": 2, "max_level": 5,  "sprite_path": "menu_sprites/menusprite1.png"},
             {"name": "Leaflynx",     "base_hp": 65, "min_level": 2, "max_level": 6,  "sprite_path": "menu_sprites/menusprite2.png"},
@@ -197,6 +245,14 @@ class GameScene(Scene):
             {"name": "Sproutlet",    "base_hp": 45, "min_level": 1, "max_level": 3,  "sprite_path": "menu_sprites/menusprite15.png"},
             {"name": "Flutterleaf",  "base_hp": 70, "min_level": 3, "max_level": 7,  "sprite_path": "menu_sprites/menusprite16.png"},
         ]
+        # ----------- MINIMAP -----------
+        self.minimap_pos = (110, 20)     # top-left corner (below your back button)
+        self.minimap_box = (220, 220)    # fixed UI box (frame size)
+        self._minimap_cache_map_id = None
+        self._minimap_map_surf = None    # scaled map image (keeps aspect ratio)
+        self._minimap_scale = 1.0
+        self._minimap_inner_offset = (0, 0)  # letterbox offset inside the frame
+
 
 
     # ------------ open/close overlays -----------------
@@ -213,8 +269,6 @@ class GameScene(Scene):
     def _close_backpack(self) -> None:
         self.backpack_open = False
 
-    # --------------------------------------------------
-        
     @override
     def enter(self) -> None:
         sound_manager.play_bgm("longvideogame.ogg")
@@ -239,6 +293,10 @@ class GameScene(Scene):
         if self.backpack_open:
             self.backpack_close_button.update(dt)
             return
+        
+        if self.shop_open:
+            self._update_shop_overlay(dt)
+            return
 
 
         # Check if there is assigned next scene
@@ -252,6 +310,15 @@ class GameScene(Scene):
             
         # Update others
         self.game_manager.bag.update(dt)
+        # update shop npc (idle animation + near check)
+        self.shop_npc.update(dt)
+
+        # open shop when near + press SPACE
+        if self.shop_npc.interact_pressed():
+            self.shop_open = True
+            self.shop_tab = "buy"
+            return
+
         
                 # --- Bush interaction: stand on bush + press E to catch ---
         if self.game_manager.player:
@@ -275,6 +342,7 @@ class GameScene(Scene):
                 return
 
 
+
         self.back_button.update(dt)
         self.overlay_button.update(dt)
         self.backpack_button.update(dt)
@@ -291,7 +359,115 @@ class GameScene(Scene):
 
         if self.near_bush:
             self.catch_button.update(dt)
-        # ----------------------------------------------------------------
+    
+    def _bag_get_count(self, item_name: str) -> int:
+        items = getattr(self.game_manager.bag, "_items_data", [])
+        for it in items:
+            if it.get("name") == item_name:
+                return int(it.get("count", 0))
+        return 0
+
+    def _bag_add_item(self, item_name: str, delta: int, sprite_path: str = "") -> None:
+        items = getattr(self.game_manager.bag, "_items_data", [])
+        for it in items:
+            if it.get("name") == item_name:
+                it["count"] = int(it.get("count", 0)) + delta
+                if sprite_path and (not it.get("sprite_path")):
+                    it["sprite_path"] = sprite_path
+                return
+        # not found → create new
+        items.append({"name": item_name, "count": delta, "sprite_path": sprite_path})
+
+    def _bag_remove_item(self, item_name: str, delta: int) -> bool:
+        """Return True if removed successfully."""
+        items = getattr(self.game_manager.bag, "_items_data", [])
+        for i, it in enumerate(items):
+            if it.get("name") == item_name:
+                cur = int(it.get("count", 0))
+                if cur < delta:
+                    return False
+                newc = cur - delta
+                it["count"] = newc
+                if newc <= 0:
+                    items.pop(i)
+                return True
+        return False
+
+    def _coins(self) -> int:
+        return self._bag_get_count("Coins")
+
+    def _add_coins(self, delta: int) -> None:
+        self._bag_add_item("Coins", delta, "ingame_ui/coin.png")
+
+    def _spend_coins(self, cost: int) -> bool:
+        if self._coins() < cost:
+            return False
+        return self._bag_remove_item("Coins", cost)
+    
+    def _update_shop_overlay(self, dt: float) -> None:  
+        mouse_now = pg.mouse.get_pressed()[0]
+        click = mouse_now and (not self._mouse_prev)
+        self._mouse_prev = mouse_now
+
+        mx, my = pg.mouse.get_pos()
+
+        # ESC to close
+        keys = pg.key.get_pressed()
+        if keys[pg.K_ESCAPE]:
+            self.shop_open = False
+            return
+
+        if click:
+            if self.shop_close_rect.collidepoint(mx, my):
+                self.shop_open = False
+                return
+            if self.shop_buy_tab_rect.collidepoint(mx, my):
+                self.shop_tab = "buy"
+                return
+            if self.shop_sell_tab_rect.collidepoint(mx, my):
+                self.shop_tab = "sell"
+                return
+
+            # Click on buy/sell rows
+            self._shop_handle_list_click(mx, my)
+
+    def _shop_guess_sell_price(self, name: str) -> int:
+        # sell = half of buy price if item exists in shop_inventory, else 1
+        for it in self.shop_inventory:
+            if it.get("name") == name:
+                return max(1, int(it.get("price", 0)) // 2)
+        return 1
+
+    def _shop_handle_list_click(self, mx: int, my: int) -> None:
+        rects = getattr(self, "_shop_row_action_rects", [])
+        if not rects:
+            return
+
+        if self.shop_tab == "buy":
+            data = self.shop_inventory
+        else:
+            data = [it for it in getattr(self.game_manager.bag, "_items_data", []) if it.get("name") != "Coins"]
+
+        for (kind, idx, r) in rects:
+            if r.collidepoint(mx, my):
+                if idx >= len(data):
+                    return
+                item = data[idx]
+                name = item.get("name", "")
+                if kind == "buy":
+                    price = int(item.get("price", 0))
+                    if self._spend_coins(price):
+                        self._bag_add_item(name, 1, item.get("sprite_path", ""))
+                        Logger.info(f"Bought {name} -${price}")
+                    else:
+                        Logger.info("Not enough coins")
+                else:
+                    sell_price = self._shop_guess_sell_price(name)
+                    if self._bag_remove_item(name, 1):
+                        self._add_coins(sell_price)
+                        Logger.info(f"Sold {name} +${sell_price}")
+                return
+
 
     @override
     def draw(self, screen: pg.Surface):        
@@ -325,7 +501,8 @@ class GameScene(Scene):
                     pos = cam.transform_position_as_position(Position(player["x"], player["y"]))
                     self.sprite_online.update_pos(pos)
                     self.sprite_online.draw(screen)
-
+        
+        self._draw_minimap(screen, camera)
         self.back_button.draw(screen)
         self.overlay_button.draw(screen)
         self.backpack_button.draw(screen)
@@ -338,7 +515,6 @@ class GameScene(Scene):
             lx = self.catch_button.rect.x + (self.catch_button.rect.width - label.get_width()) // 2
             ly = self.catch_button.rect.y + (self.catch_button.rect.height - label.get_height()) // 2
             screen.blit(label, (lx, ly))
-        # --------------------------------------------------------------
 
         # SETTINGS overlay
         if self.overlay_open:
@@ -375,6 +551,10 @@ class GameScene(Scene):
                 (rect_x + 30, rect_y + 60)
             )
 
+            # draw shop npc in world coords (convert via camera)
+            
+
+
             # Draw slider itself
             self.overlay_volume_slider.draw(screen)
 
@@ -384,13 +564,81 @@ class GameScene(Scene):
             # Back button to close overlay
             self.overlay_back_button.draw(screen)
 
+        self.shop_npc.draw(screen, camera)
         if self.backpack_open:
             self._draw_backpack_overlay(screen)
+        if self.shop_open:
+            self._draw_shop_overlay(screen)
 
-    # ---------------- BACKPACK overlay (unchanged) ------------------
+
+    
+    # ----------------MINIMAPP_--------------
+    def _draw_minimap(self, screen: pg.Surface, camera: PositionCamera) -> None:
+        self._rebuild_minimap_if_needed()
+        if self._minimap_map_surf is None:
+            return
+
+        x0, y0 = self.minimap_pos
+        box_w, box_h = self.minimap_box
+        off_x, off_y = self._minimap_inner_offset
+        scale = self._minimap_scale
+
+        frame = pg.Rect(x0, y0, box_w, box_h)
+        panel = pg.Surface((box_w, box_h), pg.SRCALPHA)
+        panel.fill((0, 0, 0, 120))  # translucent dark
+        screen.blit(panel, (x0, y0))
+        pg.draw.rect(screen, (0, 0, 0), frame, 3, border_radius=6)
+
+        # the map is centered inside the square frame
+        screen.blit(self._minimap_map_surf, (x0 + off_x, y0 + off_y))
+
+        # player dot
+        if self.game_manager.player:
+            px = self.game_manager.player.position.x
+            py = self.game_manager.player.position.y
+            mx = int(x0 + off_x + px * scale)
+            my = int(y0 + off_y + py * scale)
+            pg.draw.circle(screen, (220, 0, 0), (mx, my), 4)
+
+        # camera viewport rectangle
+        vx = int(x0 + off_x + camera.x * scale)
+        vy = int(y0 + off_y + camera.y * scale)
+        vw = int(GameSettings.SCREEN_WIDTH * scale)
+        vh = int(GameSettings.SCREEN_HEIGHT * scale)
+
+        pg.draw.rect(screen, (255, 255, 255), (vx, vy, vw, vh), 2)
+
+
+    def _rebuild_minimap_if_needed(self) -> None:
+        cur_map = self.game_manager.current_map
+        if cur_map is None:
+            return
+
+        map_id = cur_map.path_name  #IMPORTANT: stable id per TMX file
+        if map_id == self._minimap_cache_map_id and self._minimap_map_surf is not None:
+            return
+
+        self._minimap_cache_map_id = map_id
+
+        full = cur_map._surface
+        map_w, map_h = full.get_size()
+        box_w, box_h = self.minimap_box
+
+        scale = max(box_w / map_w, box_h / map_h)
+        mini_w = max(1, int(map_w * scale)) 
+        mini_h = max(1, int(map_h * scale))
+
+        self._minimap_scale = scale
+        self._minimap_map_surf = pg.transform.scale(full, (mini_w, mini_h))
+
+        off_x = (box_w - mini_w) // 2
+        off_y = (box_h - mini_h) // 2
+        self._minimap_inner_offset = (off_x, off_y)
+
+    # ---------------- BACKPACK overlay ------------------
 
     def _draw_backpack_overlay(self, screen: pg.Surface) -> None:
-    # darken background
+        # darken background
         dim = pg.Surface((GameSettings.SCREEN_WIDTH, GameSettings.SCREEN_HEIGHT), pg.SRCALPHA)
         dim.fill((0, 0, 0, 140))
         screen.blit(dim, (0, 0))
@@ -430,9 +678,6 @@ class GameScene(Scene):
         card_h = 70
         card_gap = 12
         cur_y = top_y
-
-        #removethis
-        #print(pg.image.load("assets/images/UI/button_x.png"))
 
         monsters = getattr(self.game_manager.bag, "_monsters_data", [])
         for mon in monsters[:4]:  # show up to 4 (avoid overflow)
@@ -529,7 +774,7 @@ class GameScene(Scene):
         if new_manager is not None:
             self.game_manager = new_manager
 
-    # ---------------- NEW: catching logic ------------------
+    # ---------------- catching logic ------------------
 
     def _catch_pokemon(self) -> None:
         """
@@ -545,7 +790,7 @@ class GameScene(Scene):
         # Randomize its level in the given range
         level = random.randint(template["min_level"], template["max_level"])
 
-        # Simple scaling for HP based on level (you can change this formula)
+        # Simple scaling for HP based on level 
         max_hp = template["base_hp"] + (level - 1) * 5
 
         new_mon = {
@@ -559,8 +804,120 @@ class GameScene(Scene):
         self.game_manager.bag._monsters_data.append(new_mon)
         Logger.info(f"Caught a wild {new_mon['name']}! Lv{new_mon['level']}")
 
-        # optional SFX if you have one
         try:
             sound_manager.play_sound("SFX/POKEBALL_CAPTURE.wav", volume=0.7)
         except Exception:
             pass
+
+
+
+
+    def _draw_shop_overlay(self, screen: pg.Surface) -> None:
+        # dim background
+        dim = pg.Surface((GameSettings.SCREEN_WIDTH, GameSettings.SCREEN_HEIGHT), pg.SRCALPHA)
+        dim.fill((0, 0, 0, 150))
+        screen.blit(dim, (0, 0))
+
+        # panel
+        x, y, w, h = self.shop_panel_x, self.shop_panel_y, self.shop_panel_w, self.shop_panel_h
+        panel = pg.Rect(x, y, w, h)
+        pg.draw.rect(screen, (235, 160, 70), panel, border_radius=10)
+        pg.draw.rect(screen, (60, 35, 20), panel, 4, border_radius=10)
+
+        # tabs
+        def tab_color(active: bool):
+            return (250, 235, 200) if active else (210, 190, 150)
+
+        pg.draw.rect(screen, tab_color(self.shop_tab == "buy"), self.shop_buy_tab_rect, border_radius=6)
+        pg.draw.rect(screen, tab_color(self.shop_tab == "sell"), self.shop_sell_tab_rect, border_radius=6)
+        pg.draw.rect(screen, (0,0,0), self.shop_buy_tab_rect, 2, border_radius=6)
+        pg.draw.rect(screen, (0,0,0), self.shop_sell_tab_rect, 2, border_radius=6)
+
+        buy_t = self.shop_font.render("Buy", True, (0,0,0))
+        sell_t = self.shop_font.render("Sell", True, (0,0,0))
+        screen.blit(buy_t, (self.shop_buy_tab_rect.centerx - buy_t.get_width()//2,
+                        self.shop_buy_tab_rect.centery - buy_t.get_height()//2))
+        screen.blit(sell_t, (self.shop_sell_tab_rect.centerx - sell_t.get_width()//2,
+                         self.shop_sell_tab_rect.centery - sell_t.get_height()//2))
+
+        # close X
+        pg.draw.rect(screen, (250, 235, 200), self.shop_close_rect, border_radius=6)
+        pg.draw.rect(screen, (0,0,0), self.shop_close_rect, 2, border_radius=6)
+        x_t = self.shop_font.render("X", True, (0,0,0))
+        screen.blit(x_t, (self.shop_close_rect.centerx - x_t.get_width()//2,
+                      self.shop_close_rect.centery - x_t.get_height()//2))
+
+        # coins display
+        coins = self._coins()
+        coin_t = self.shop_font.render(f"Coins: {coins}", True, (0,0,0))
+        screen.blit(coin_t, (x + w - coin_t.get_width() - 80, y + 30))
+
+        # list area
+        self._draw_shop_list(screen)
+
+    def _draw_shop_list(self, screen: pg.Surface) -> None:
+        x, y = self.shop_panel_x, self.shop_panel_y
+        w, h = self.shop_panel_w, self.shop_panel_h
+
+        list_x = x + 40
+        list_y = y + 90
+        row_h = 60
+        max_rows = 5
+
+        # store clickable rects for update() click handling
+        self._shop_row_action_rects = []
+
+        if self.shop_tab == "buy":
+            data = self.shop_inventory
+        else:
+            # sell shows your bag items (except Coins)
+            data = [it for it in getattr(self.game_manager.bag, "_items_data", []) if it.get("name") != "Coins"]
+
+        for idx, it in enumerate(data[:max_rows]):
+            ry = list_y + idx * (row_h + 10)
+            row_rect = pg.Rect(list_x, ry, w - 80, row_h)
+            pg.draw.rect(screen, (250, 235, 200), row_rect, border_radius=8)
+            pg.draw.rect(screen, (0,0,0), row_rect, 2, border_radius=8)
+
+            name = it.get("name", "Item")
+            sprite_rel = it.get("sprite_path", "")
+            icon_path = "assets/images/" + sprite_rel if sprite_rel else ""
+            # icon
+            if icon_path:
+                try:
+                    icon = pg.image.load(icon_path).convert_alpha()
+                    icon = pg.transform.scale(icon, (40, 40))
+                    screen.blit(icon, (list_x + 10, ry + 10))
+                except Exception:
+                    pass
+
+            # text
+            name_t = self.shop_font.render(name, True, (0,0,0))
+            screen.blit(name_t, (list_x + 60, ry + 18))
+
+            # right side action button
+            action_w, action_h = 90, 36
+            action_rect = pg.Rect(row_rect.right - action_w - 14, ry + (row_h - action_h)//2, action_w, action_h)
+            pg.draw.rect(screen, (220, 220, 220), action_rect, border_radius=6)
+            pg.draw.rect(screen, (0,0,0), action_rect, 2, border_radius=6)
+
+            if self.shop_tab == "buy":
+                price = int(it.get("price", 0))
+                price_t = self.shop_small_font.render(f"${price}", True, (0,0,0))
+                screen.blit(price_t, (action_rect.x - price_t.get_width() - 14, action_rect.y + 10))
+                act_t = self.shop_small_font.render("BUY", True, (0,0,0))
+                self._shop_row_action_rects.append(("buy", idx, action_rect))
+            else:
+                count = int(it.get("count", 0))
+                sell_price = max(1, count and 1)  # placeholder (you can price by item name)
+                # better: sell = half of buy price if exists
+                sell_price = self._shop_guess_sell_price(name)
+                cnt_t = self.shop_small_font.render(f"x{count}", True, (0,0,0))
+                screen.blit(cnt_t, (action_rect.x - cnt_t.get_width() - 14, action_rect.y + 10))
+                price_t = self.shop_small_font.render(f"+${sell_price}", True, (0,0,0))
+                screen.blit(price_t, (action_rect.x - price_t.get_width() - 70, action_rect.y + 10))
+                act_t = self.shop_small_font.render("SELL", True, (0,0,0))
+                self._shop_row_action_rects.append(("sell", idx, action_rect))
+
+            screen.blit(act_t, (action_rect.centerx - act_t.get_width()//2,
+                            action_rect.centery - act_t.get_height()//2))

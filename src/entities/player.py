@@ -53,7 +53,8 @@ class Player(Entity):
             dis.y += 1
 
         length = math.hypot(dis.x, dis.y)
-        if length > 0:
+        moving = length > 0.0
+        if moving:
             dis.x /= length
             dis.y /= length
 
@@ -62,6 +63,22 @@ class Player(Entity):
         # applying speed and delta-time HADEH
             self.position.x += dis.x * self.speed * dt
             self.position.y += dis.y * self.speed * dt
+
+        if moving:
+    # pick a facing direction (dominant axis) for diagonals
+            if abs(dis.x) > abs(dis.y):
+                if dis.x > 0:
+                    self.animation.switch("right")
+                else:
+                    self.animation.switch("left")
+            else:
+                if dis.y > 0:
+                    self.animation.switch("down")   # front
+                else:
+                    self.animation.switch("up")     # back
+        else:
+            # optional: stop walking animation when idle
+            self.animation.accumulator = 0.0
 
         ts = GameSettings.TILE_SIZE
         speed = self.speed * dt
@@ -115,7 +132,11 @@ class Player(Entity):
             Logger.warning(f"Teleport destination '{tp.destination}' not loaded")
 
                 
-        super().update(dt)
+       # super().update(dt)
+        self.animation.update_pos(self.position)
+        if moving:
+            self.animation.update(dt)
+
         
 
         
