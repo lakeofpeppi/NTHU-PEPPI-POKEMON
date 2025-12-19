@@ -166,7 +166,7 @@ class GameScene(Scene):
         catch_x = GameSettings.SCREEN_WIDTH // 2 - catch_w // 2
         catch_y = GameSettings.SCREEN_HEIGHT - catch_h - 30
 
-        # Use temporary button sprites – replace with your own PNG later:
+        
         self.catch_button = Button(
             "UI/raw/UI_Flat_ToggleOff01a.png",        # TODO: replace with your asset
             "UI/raw/UI_Flat_ToggleOff02a.png",  # TODO: replace with your asset
@@ -180,31 +180,24 @@ class GameScene(Scene):
                 # ----------- Wild pokemon pool for bushes -----------
         # You can tweak these or load them from JSON later
         self.wild_pokemon_pool = [
-            {
-                "name": "Bushmon",
-                "base_hp": 50,
-                "min_level": 2,
-                "max_level": 5,
-                "sprite_path": "menu_sprites/menusprite3.png",
-            },
-            {
-                "name": "Leafy",
-                "base_hp": 60,
-                "min_level": 3,
-                "max_level": 7,
-                "sprite_path": "menu_sprites/menusprite4.png",
-            },
-            {
-                "name": "Stoneling",
-                "base_hp": 80,
-                "min_level": 4,
-                "max_level": 8,
-                "sprite_path": "menu_sprites/menusprite5.png",
-            },
+            {"name": "Bushmon",      "base_hp": 60, "min_level": 2, "max_level": 5,  "sprite_path": "menu_sprites/menusprite1.png"},
+            {"name": "Leaflynx",     "base_hp": 65, "min_level": 2, "max_level": 6,  "sprite_path": "menu_sprites/menusprite2.png"},
+            {"name": "Verdpuma",     "base_hp": 75, "min_level": 3, "max_level": 7,  "sprite_path": "menu_sprites/menusprite3.png"},
+            {"name": "Brownbit",     "base_hp": 55, "min_level": 1, "max_level": 4,  "sprite_path": "menu_sprites/menusprite4.png"},
+            {"name": "Pebblip",      "base_hp": 50, "min_level": 1, "max_level": 4,  "sprite_path": "menu_sprites/menusprite5.png"},
+            {"name": "Frostfox",     "base_hp": 70, "min_level": 3, "max_level": 7,  "sprite_path": "menu_sprites/menusprite6.png"},
+            {"name": "Sparkpup",     "base_hp": 55, "min_level": 1, "max_level": 4,  "sprite_path": "menu_sprites/menusprite7.png"},
+            {"name": "Rufffang",     "base_hp": 70, "min_level": 2, "max_level": 6,  "sprite_path": "menu_sprites/menusprite8.png"},
+            {"name": "Blazewing",    "base_hp": 95, "min_level": 6, "max_level": 10, "sprite_path": "menu_sprites/menusprite9.png"},
+            {"name": "Nightmew",     "base_hp": 60, "min_level": 3, "max_level": 7,  "sprite_path": "menu_sprites/menusprite10.png"},
+            {"name": "Serpflare",    "base_hp": 75, "min_level": 4, "max_level": 8,  "sprite_path": "menu_sprites/menusprite11.png"},
+            {"name": "Aquabit",      "base_hp": 60, "min_level": 2, "max_level": 6,  "sprite_path": "menu_sprites/menusprite12.png"},
+            {"name": "Glidefin",     "base_hp": 65, "min_level": 2, "max_level": 6,  "sprite_path": "menu_sprites/menusprite13.png"},
+            {"name": "Seascale",     "base_hp": 90, "min_level": 5, "max_level": 9,  "sprite_path": "menu_sprites/menusprite14.png"},
+            {"name": "Sproutlet",    "base_hp": 45, "min_level": 1, "max_level": 3,  "sprite_path": "menu_sprites/menusprite15.png"},
+            {"name": "Flutterleaf",  "base_hp": 70, "min_level": 3, "max_level": 7,  "sprite_path": "menu_sprites/menusprite16.png"},
         ]
-        # ----------------------------------------------------
 
-        # ------------------------------------------------
 
     # ------------ open/close overlays -----------------
 
@@ -224,7 +217,7 @@ class GameScene(Scene):
         
     @override
     def enter(self) -> None:
-        sound_manager.play_bgm("RBY 103 Pallet Town.ogg")
+        sound_manager.play_bgm("longvideogame.ogg")
         if self.online_manager:
             self.online_manager.enter()
         
@@ -246,28 +239,6 @@ class GameScene(Scene):
         if self.backpack_open:
             self.backpack_close_button.update(dt)
             return
-        
-        if self.game_manager.player:
-            px = self.game_manager.player.position.x
-            py = self.game_manager.player.position.y
-
-            '''
-            on_bush = self.game_manager.current_map.is_bush_tile(px, py)
-
-            # player just stepped ON a bush tile this frame
-            if on_bush and not self.in_bush:
-                self.in_bush = True
-                scene_manager.change_scene("catchpokemon")
-                return  # stop updating after scene switch
-
-            # player is NOT on a bush tile anymore
-            elif not on_bush:
-                self.in_bush = False
-                '''
-            if self.game_manager.current_map.consume_bush_at_pixel(px, py):
-                from src.core.services import scene_manager
-                scene_manager.change_scene("catchpokemon", transition=True, duration=0.5)
-                return
 
 
         # Check if there is assigned next scene
@@ -283,14 +254,26 @@ class GameScene(Scene):
         self.game_manager.bag.update(dt)
         
                 # --- Bush interaction: stand on bush + press E to catch ---
-        if self.game_manager.player is not None:
-            ts = GameSettings.TILE_SIZE
-            px = int(self.game_manager.player.position.x // ts)
-            py = int(self.game_manager.player.position.y // ts)
+        if self.game_manager.player:
+            px = self.game_manager.player.position.x
+            py = self.game_manager.player.position.y
 
             if self.game_manager.current_map.consume_bush_at_pixel(px, py):
+                template = random.choice(self.wild_pokemon_pool)
+                level = random.randint(template["min_level"], template["max_level"])
+                max_hp = template["base_hp"] + (level - 1) * 5
+
+                self.game_manager.pending_encounter = {
+                    "name": template["name"],
+                    "hp": max_hp,
+                    "max_hp": max_hp,
+                    "level": level,
+                    "sprite_path": template["sprite_path"],
+                }
+
                 scene_manager.change_scene("catchpokemon", transition=True, duration=0.5)
                 return
+
 
         self.back_button.update(dt)
         self.overlay_button.update(dt)

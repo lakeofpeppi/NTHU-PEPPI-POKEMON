@@ -50,10 +50,7 @@ class BattleScene(Scene):
         self.font_big = pg.font.Font("assets/fonts/Minecraft.ttf", 32)
         self.font_small = pg.font.Font("assets/fonts/Minecraft.ttf", 24)
 
-        # You can swap these rectangles with your own sprites later:
-        #   BATTLE_BACKGROUND.png
-        #   PLAYER_MONSTER.png
-        #   ENEMY_MONSTER.png
+       
 
     @override
     def enter(self) -> None:

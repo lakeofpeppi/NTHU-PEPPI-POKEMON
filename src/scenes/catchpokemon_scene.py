@@ -26,16 +26,7 @@ class CatchPokemonScene(Scene):
 
         # same background style as battle_scene
         self.background = BackgroundSprite("backgrounds/background2.png")
-        self.pokemon = Sprite("menu_sprites/menusprite4.png", (300,300))
-        self.pokemon.rect.center = (
-            GameSettings.SCREEN_WIDTH // 2,
-            GameSettings.SCREEN_HEIGHT // 2 - 50
-        
-        )
-        self.pokemon.rect.midbottom = (
-        GameSettings.SCREEN_WIDTH // 2,
-    GameSettings.SCREEN_HEIGHT // 2 + 50
-)
+        #self.pokemon = Sprite("menu_sprites/menusprite4.png", (300,300))
 
 
         # pixel font (fallback to default if file missing)
@@ -44,44 +35,67 @@ class CatchPokemonScene(Scene):
         except FileNotFoundError:
             self.font = pg.font.Font(None, 24)
 
-        # monster that will be added to the bag if player chooses "Catch"
-        self.monster_data = self._generate_monster()
+       
+        self.monster_data = None
+        self.pokemon = None
 
-        # ---- button geometry (we store rects ourselves; NO Button.rect needed) ----
-        btn_w, btn_h = 220, 64
+
+        # ----  ----
+        BTN_SIZE = 100
+        SPACING = 100
+
         cx = GameSettings.SCREEN_WIDTH // 2
         y = GameSettings.SCREEN_HEIGHT - 120
 
-        self.catch_btn_rect = pg.Rect(cx - btn_w - 20, y, btn_w, btn_h)
-        self.run_btn_rect   = pg.Rect(cx + 20,        y, btn_w, btn_h)
 
-        # NOTE: replace these PNG paths with your own button assets if you want
+        self.catch_btn_rect = pg.Rect(
+        cx - BTN_SIZE - SPACING // 2,
+        y,
+        BTN_SIZE,
+        BTN_SIZE
+        )
+
+        self.run_btn_rect = pg.Rect(
+        cx + SPACING // 2,
+        y,
+        BTN_SIZE,
+        BTN_SIZE
+        )
+
+
         self.catch_button = Button(
             "UI/raw/UI_Flat_Button02a_4.png", "UI/raw/UI_Flat_Button02a_1.png",
             self.catch_btn_rect.x, self.catch_btn_rect.y,
-            self.catch_btn_rect.width, self.catch_btn_rect.height,
+            BTN_SIZE, BTN_SIZE,
             self._on_catch,
         )
-        '''
+        
         self.run_button = Button(
-            "UI/raw/UI_Flat_Button02a_4.png", "UI/raw/UI_Flat_Button02a_1.png",
+            "UI/button_x.png", "UI/button_x_hover.png",
             self.run_btn_rect.x, self.run_btn_rect.y,
-            self.run_btn_rect.width, self.run_btn_rect.height,
-            self._on_run,
+            BTN_SIZE, BTN_SIZE,
+            self._on_run
         )
-        '''
-        self.run_button = Button(
-            "UI/raw/UI_Flat_Button02a_4.png", "UI/raw/UI_Flat_Button02a_1.png",
-            self.run_btn_rect.x, self.run_btn_rect.y,
-            self.run_btn_rect.width, self.run_btn_rect.height,
-            lambda: scene_manager.change_scene("game", transition=True, duration=0.25)
-        )
+
+    def _on_run(self) -> None:
+        self._clear_pending_encounter()
+        self._reset_encounter_view()
+        scene_manager.change_scene("game", transition=True, duration=0.25)
 
 
     # ------------------------------------------------------------------ helpers --
 
-    def _generate_monster(self) -> dict:
-        """Create a simple bush monster; tweak however you like."""
+    def _get_encounter_monster(self) -> dict:
+        scenes = getattr(scene_manager, "_scenes", {})
+        game_scene = scenes.get("game")
+
+        if game_scene and hasattr(game_scene, "game_manager"):
+            gm = game_scene.game_manager
+            enc = getattr(gm, "pending_encounter", None)
+            if isinstance(enc, dict):
+                return enc
+
+        # fallback always returns something valid
         lvl = random.randint(3, 7)
         max_hp = 60 + 5 * lvl
         return {
@@ -89,8 +103,16 @@ class CatchPokemonScene(Scene):
             "level": lvl,
             "hp": max_hp,
             "max_hp": max_hp,
-            "sprite_path": "menu_sprites/menusprite15.png",
+            "sprite_path": "menu_sprites/menusprite1.png",
         }
+
+
+    def _clear_pending_encounter(self) -> None:
+        scenes = getattr(scene_manager, "_scenes", {})
+        game_scene = scenes.get("game")
+        if game_scene and hasattr(game_scene, "game_manager"):
+            game_scene.game_manager.pending_encounter = None
+
 
     def _add_monster_to_bag(self) -> None:
         """
@@ -121,7 +143,8 @@ class CatchPokemonScene(Scene):
 
     def _on_catch(self) -> None:
         self._add_monster_to_bag()
-        # optional SFX – change to your own
+        self._clear_pending_encounter()
+        self._reset_encounter_view()
         try:
             sound_manager.play_sound("SFX/CATCH_SUCCESS.ogg", 0.7)
         except Exception:
@@ -129,12 +152,22 @@ class CatchPokemonScene(Scene):
         scene_manager.change_scene("game", transition=True, duration=0.25)
 
 
-    '''
-    def _on_run(self) -> None:
 
-        scene_manager.change_scene("game")
-    '''
     # --------------------------------------------------------------- Scene API ----
+
+    @override
+    def enter(self) -> None:
+    # every time we enter this scene, pull the pending encounter again
+        self.monster_data = self._get_encounter_monster()
+        self.pokemon = Sprite(self.monster_data["sprite_path"], (200, 200))
+        self.pokemon.rect.midbottom = (
+            GameSettings.SCREEN_WIDTH // 2,
+            GameSettings.SCREEN_HEIGHT // 2 + 80
+        )
+    def _reset_encounter_view(self) -> None:
+        self.monster_data = None
+        self.pokemon = None
+
 
     @override
     def update(self, dt: float) -> None:
@@ -145,12 +178,15 @@ class CatchPokemonScene(Scene):
     def draw(self, screen: pg.Surface) -> None:
         # background
         self.background.draw(screen)
+        if self.monster_data is None or self.pokemon is None:
+            self.catch_button.draw(screen)
+            self.run_button.draw(screen)
+            return
         self.pokemon.draw(screen)
 
         # title & message
         title = self.font.render("Wild Pokemon found!", True, (0, 0, 0))
         msg   = self.font.render("Catch this Pokemon?", True, (0, 0, 0))
-
         screen.blit(
             title,
             (GameSettings.SCREEN_WIDTH // 2 - title.get_width() // 2, 40),
@@ -159,6 +195,10 @@ class CatchPokemonScene(Scene):
             msg,
             (GameSettings.SCREEN_WIDTH // 2 - msg.get_width() // 2, 100),
         )
+        name = self.monster_data["name"]
+        lvl = self.monster_data["level"]
+        info = self.font.render(f"{name}  Lv{lvl}", True, (0, 0, 0))
+        screen.blit(info, (GameSettings.SCREEN_WIDTH//2 - info.get_width()//2, 140))
 
         # draw buttons
         self.catch_button.draw(screen)
@@ -168,21 +208,21 @@ class CatchPokemonScene(Scene):
         catch_label = self.font.render("Catch Pokemon", True, (0, 0, 0))
         run_label   = self.font.render("Run", True, (0, 0, 0))
 
+        
+
         screen.blit(
             catch_label,
             (
-                self.catch_btn_rect.x
-                + (self.catch_btn_rect.width - catch_label.get_width()) // 2,
-                self.catch_btn_rect.y
-                + (self.catch_btn_rect.height - catch_label.get_height()) // 2 - 60,
-            ),
+                self.catch_btn_rect.centerx - catch_label.get_width() // 2,
+                self.catch_btn_rect.top - 28   # text ABOVE button
         )
+        )
+
         screen.blit(
             run_label,
             (
-                self.run_btn_rect.x
-                + (self.run_btn_rect.width - run_label.get_width()) // 2,
-                self.run_btn_rect.y
-                + (self.run_btn_rect.height - run_label.get_height()) // 2 - 60 ,
-            ),
+                self.run_btn_rect.centerx - run_label.get_width() // 2,
+                self.run_btn_rect.top - 28
+            )
         )
+
