@@ -38,12 +38,15 @@ class OnlineManager:
 
         self.base: str = GameSettings.ONLINE_SERVER_URL
         # Convert HTTP URL to WebSocket URL
-        if self.base.startswith("http://"):
+        if self.base.startswith(("ws://", "wss://")):
+            self.ws_url = self.base
+        elif self.base.startswith("https://"):
             self.ws_url = self.base.replace("http://", "ws://")
         elif self.base.startswith("https://"):
             self.ws_url = self.base.replace("https://", "wss://")
         else:
             self.ws_url = f"ws://{self.base}"
+
 
         self.player_id = -1
         self.list_players = []

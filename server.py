@@ -89,14 +89,17 @@ async def broadcast_player_update():
 
 async def handle_client(websocket: Any):
     """Handle a WebSocket client connection"""
-    player_id = -1
+    #player_id = -1
     
     async with CLIENTS_LOCK:
         CONNECTED_CLIENTS.add(websocket)
     
+    player_id = PLAYER_HANDLER.register()
+    print("[Server] registered", player_id)
+
     try:
         # Register player on connection - server assigns ID
-        player_id = PLAYER_HANDLER.register()
+        #player_id = PLAYER_HANDLER.register()
         await websocket.send(json.dumps({
             "type": "registered",
             "id": player_id
@@ -138,7 +141,7 @@ async def handle_client(websocket: Any):
                     direction = str(data.get("dir", "down"))   # "up"|"down"|"left"|"right"
                     moving = bool(data.get("moving", False))   # True if walking
 
-                    # update player state in handler
+                    # update playear state in handler
                     PLAYER_HANDLER.update(player_id, x, y, map_name, direction, moving)
                     
                 elif msg_type == "chat_send":
@@ -178,7 +181,7 @@ async def handle_client(websocket: Any):
                     "message": str(e)
                 }))
                 
-    except Exception:
+    except Exception as e:
         print(f"[Server] Client handler error: {e}")
     finally:
         # Unregister player on disconnect

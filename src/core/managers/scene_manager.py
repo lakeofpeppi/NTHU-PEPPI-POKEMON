@@ -117,6 +117,15 @@ class SceneManager:
             Logger.info(f"Changing scene to '{scene_name}' (no transition)")
             self._next_scene = scene_name
 
+    def handle_event(self, event: pg.event.Event) -> None:
+        # If transitioning, optionally forward to transition scene (usually you ignore input)
+        if self._transition is not None:
+            return
+
+        if self._current_scene:
+         self._current_scene.handle_event(event)
+    
+
     def update(self, dt: float) -> None:
         # 1) Handle normal scene switch
         if self._next_scene is not None and self._transition is None:
@@ -141,6 +150,7 @@ class SceneManager:
         # 3) Normal update
         if self._current_scene:
             self._current_scene.update(dt)
+
 
     def draw(self, screen: pg.Surface) -> None:
         if self._transition is not None:

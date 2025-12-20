@@ -11,8 +11,14 @@ class Scene:
     def exit(self) -> None:
         ...
 
+    def handle_event(self, event: pg.event.Event) -> None:
+        # default: ignore
+        return
+
     def update(self, dt: float) -> None:
         ...
 
     def draw(self, screen: pg.Surface) -> None:
         ...
+
+    

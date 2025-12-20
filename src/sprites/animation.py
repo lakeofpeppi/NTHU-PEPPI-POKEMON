@@ -50,7 +50,7 @@ class Animation(Sprite):
         self.cur_row = name
         
     def update(self, dt: float):
-         self.accumulator = (self.accumulator + dt) % self.loop
+        self.accumulator = (self.accumulator + dt) % self.loop
         
     def draw(self, screen: pg.Surface, camera: Optional[PositionCamera] = None):
         frames = self.animations[self.cur_row]

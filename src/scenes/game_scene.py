@@ -12,6 +12,9 @@ from src.interface.components import Button, Slider, Checkbox
 from src.sprites import Sprite
 from typing import override
 from collections import deque
+from src.entities.online_player import OnlinePlayer
+from src.interface.chat_overlay import ChatOverlay
+
 
 class GameScene(Scene):
     game_manager: GameManager
@@ -40,8 +43,11 @@ class GameScene(Scene):
             Logger.error("Failed to load game manager")
             exit(1)
         self.game_manager = manager
+        self.remote_players: dict[int, OnlinePlayer] = {}
 
-
+        #----------CHAT-----------
+        self.chat_overlay = ChatOverlay()
+        self.chat_open = False
         # -------- MINIMAP --------
         self.minimap_w = 180
         self.minimap_h = 180
@@ -101,8 +107,8 @@ class GameScene(Scene):
         else:
             self.online_manager = None
         self.sprite_online = Sprite("ingame_ui/options1.png", (GameSettings.TILE_SIZE, GameSettings.TILE_SIZE))
+        Logger.info(f"IS_ONLINE={GameSettings.IS_ONLINE}, online_manager={self.online_manager is not None}")
 
-        #
 
         # overlay button (settings)
         btn_w, btn_h = 80, 80
@@ -561,7 +567,45 @@ class GameScene(Scene):
             if self.game_manager.player:
                 self.game_manager.player.update(dt)
 
-        
+        if self.online_manager is not None and self.game_manager.player is not None:
+            self.online_manager.update(
+                self.game_manager.player.position.x,
+                self.game_manager.player.position.y,
+                self.game_manager.current_map.path_name,  # use path_name consistently
+                self.game_manager.player.facing_dir,
+                self.game_manager.player.moving
+            )
+
+        # Update remote players (same map only recommended)
+        if self.online_manager is not None:
+            net_players = self.online_manager.get_list_players()
+            alive = set()
+
+            for p in net_players:
+                pid = int(p["id"])
+                if str(p.get("map", "")) != self.game_manager.current_map.path_name:
+                    continue
+                alive.add(pid)
+
+                # optionally skip players on different maps
+                #if str(p.get("map", "")) != self.game_manager.current_map.map_name:
+                #    continue
+
+                rp = self.remote_players.get(pid)
+                if rp is None:
+                    rp = self.remote_players[pid] = OnlinePlayer(p["x"], p["y"])
+
+                rp.apply_state(
+                    p["x"], p["y"],
+                    p.get("dir", "down"),
+                    p.get("moving", False)
+                )
+                rp.update(dt)
+
+            # Remove disconnected
+            for pid in list(self.remote_players.keys()):
+                if pid not in alive:
+                    del self.remote_players[pid]
 
         for enemy in self.game_manager.current_enemy_trainers:
             enemy.update(dt)
@@ -624,6 +668,31 @@ class GameScene(Scene):
 
         if self.near_bush:
             self.catch_button.update(dt)
+
+    @override
+    def handle_event(self, event: pg.event.Event) -> None:
+        # Do not allow chat if offline
+        if self.online_manager is None:
+            return
+
+        # Open chat with T (only when no other overlay is open)
+        if event.type == pg.KEYDOWN and event.key == pg.K_t:
+            if (not self.overlay_open) and (not self.backpack_open) and (not self.shop_open) and (not self.nav_open):
+                self.chat_open = True
+                self.chat_overlay.open()
+            return
+
+        # If chat is open, it consumes typing and blocks gameplay controls
+        if self.chat_open:
+            submitted = self.chat_overlay.handle_event(event)
+            if submitted is not None:
+                self.online_manager.send_chat(submitted)
+
+            if not self.chat_overlay.opened:
+                self.chat_open = False
+            return
+
+
     
     def _bag_get_count(self, item_name: str) -> int:
         items = getattr(self.game_manager.bag, "_items_data", [])
@@ -760,7 +829,11 @@ class GameScene(Scene):
             enemy.draw(screen, camera)
 
         self.game_manager.bag.draw(screen)
-        
+
+        for rp in self.remote_players.values():
+            rp.draw(screen, camera)
+
+        '''
         if self.online_manager and self.game_manager.player:
             list_online = self.online_manager.get_list_players()
             for player in list_online:
@@ -769,6 +842,7 @@ class GameScene(Scene):
                     pos = cam.transform_position_as_position(Position(player["x"], player["y"]))
                     self.sprite_online.update_pos(pos)
                     self.sprite_online.draw(screen)
+        '''
         
         self._draw_minimap(screen, camera)
         self.back_button.draw(screen)
@@ -879,6 +953,18 @@ class GameScene(Scene):
             label_under(self.nav_gym_btn, "gym")
             label_under(self.nav_home_btn, "home")
             label_under(self.nav_np_btn, "northpole")
+
+        if self.online_manager:
+            n = len(self.online_manager.get_list_players())
+            txt = self.bag_small_font.render(f"REMOTE: {n}", True, (255,255,255))
+            screen.blit(txt, (20, 20))
+
+
+        if self.chat_open and self.online_manager is not None:
+            msgs = self.online_manager.get_recent_chat(50)
+            self.chat_overlay.draw(screen, msgs)
+
+        
         
 
 

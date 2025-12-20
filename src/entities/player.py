@@ -17,10 +17,11 @@ class Player(Entity):
         self.moving = False
 
 
+    '''
     @override
     def update(self, dt: float) -> None:
         dis = Position(0, 0)
-        '''
+        
         [TODO HACKATHON 2]
         Calculate the distance change, and then normalize the distance
         
@@ -44,7 +45,7 @@ class Player(Entity):
             dis.y += ...
         
         self.position = ...
-        '''
+        python
         dis = Position(0.0, 0.0)
         if input_manager.key_down(pg.K_LEFT) or input_manager.key_down(pg.K_a):
             dis.x -= 1
@@ -141,9 +142,84 @@ class Player(Entity):
             self.animation.update(dt)
 
         
-
+    '''
         
+    @override
+    def update(self, dt: float) -> None:
+        # 1) Input direction
+        dis = Position(0.0, 0.0)
+        if input_manager.key_down(pg.K_LEFT) or input_manager.key_down(pg.K_a):
+            dis.x -= 1
+        if input_manager.key_down(pg.K_RIGHT) or input_manager.key_down(pg.K_d):
+            dis.x += 1
+        if input_manager.key_down(pg.K_UP) or input_manager.key_down(pg.K_w):
+            dis.y -= 1
+        if input_manager.key_down(pg.K_DOWN) or input_manager.key_down(pg.K_s):
+            dis.y += 1
 
+        # 2) Normalize
+        length = math.hypot(dis.x, dis.y)
+        moving = length > 0.0
+        if moving:
+            dis.x /= length
+            dis.y /= length
+
+        # 3) Save state for animation + online
+        self.moving = moving
+        if moving:
+            if abs(dis.x) > abs(dis.y):
+                self.facing_dir = "right" if dis.x > 0 else "left"
+            else:
+                self.facing_dir = "down" if dis.y > 0 else "up"
+
+        # 4) Collision movement (X then Y)
+        ts = GameSettings.TILE_SIZE
+        step = self.speed * dt
+
+        def collider_rect_at(x: float, y: float) -> pg.Rect:
+            return pg.Rect(int(x), int(y), ts, ts)
+
+        def collides_any(rect: pg.Rect) -> bool:
+            # Map collision
+            if self.game_manager.current_map.check_collision(rect):
+                return True
+        # Enemy collision
+            for enemy in self.game_manager.current_enemy_trainers:
+                er = getattr(enemy, "collider", None) or getattr(enemy, "rect", None)
+                if er is None:
+                    ex = getattr(enemy, "position", Position(0, 0)).x
+                    ey = getattr(enemy, "position", Position(0, 0)).y
+                    er = pg.Rect(int(ex), int(ey), ts, ts)
+                if rect.colliderect(er):
+                    return True
+            return False
+
+        if moving and dis.x != 0:
+            new_x = self.position.x + dis.x * step
+            if not collides_any(collider_rect_at(new_x, self.position.y)):
+                self.position.x = new_x
+
+        if moving and dis.y != 0:
+            new_y = self.position.y + dis.y * step
+            if not collides_any(collider_rect_at(self.position.x, new_y)):
+                self.position.y = new_y
+
+        # 5) Teleport check
+        tp = self.game_manager.current_map.check_teleport(self.position)
+        if tp:
+            dest = tp.destination
+            self.game_manager.switch_map(dest)
+            if tp.destination not in self.game_manager.maps:
+                Logger.warning(f"Teleport destination '{tp.destination}' not loaded")
+
+        # 6) Animation
+        self.animation.switch(self.facing_dir)
+        self.animation.update_pos(self.position)
+        if self.moving:
+            self.animation.update(dt)
+        else:
+            # Freeze on first frame for idle look
+            self.animation.accumulator = 0.0
 
 
     @override
