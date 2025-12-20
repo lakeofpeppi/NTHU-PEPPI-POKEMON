@@ -196,6 +196,10 @@ class GameScene(Scene):
         # Load banner image for monster cards
         self.mon_banner_img = pg.image.load("assets/images/UI/raw/UI_Flat_Banner03a.png").convert_alpha()
 
+        self.element_icon_cache = {}
+        self.element_icon_size = 18
+
+
         # Close button (top-right of panel)
         x_size = 48
         x_x = self.bag_panel_x + self.bag_panel_w - x_size - 14
@@ -222,9 +226,9 @@ class GameScene(Scene):
         # where the player should go (tile coords)
         # IMPORTANT: change these to your real tile targets
         self.nav_places = {
-            "gym":       {"map": self.game_manager.current_map.path_name, "tile": (24, 23)},
-            "home":      {"map": self.game_manager.current_map.path_name, "tile": (16, 29)},
-            "northpole": {"map": self.game_manager.current_map.path_name, "tile": (54, 14)},
+            "gym":       {"map": "map.tmx", "tile": (24, 23)},
+            "home":      {"map": "map.tmx", "tile": (16, 29)},
+            "northpole": {"map": "map.tmx", "tile": (54, 14)},
         }
 
         # nav button below back button
@@ -289,23 +293,28 @@ class GameScene(Scene):
         
                 # ----------- Wild pokemon pool for bushes -----------
         self.wild_pokemon_pool = [
-            {"name": "Bushmon",      "base_hp": 60, "min_level": 2, "max_level": 5,  "sprite_path": "menu_sprites/menusprite1.png"},
-            {"name": "Leaflynx",     "base_hp": 65, "min_level": 2, "max_level": 6,  "sprite_path": "menu_sprites/menusprite2.png"},
-            {"name": "Verdpuma",     "base_hp": 75, "min_level": 3, "max_level": 7,  "sprite_path": "menu_sprites/menusprite3.png"},
-            {"name": "Brownbit",     "base_hp": 55, "min_level": 1, "max_level": 4,  "sprite_path": "menu_sprites/menusprite4.png"},
-            {"name": "Pebblip",      "base_hp": 50, "min_level": 1, "max_level": 4,  "sprite_path": "menu_sprites/menusprite5.png"},
-            {"name": "Frostfox",     "base_hp": 70, "min_level": 3, "max_level": 7,  "sprite_path": "menu_sprites/menusprite6.png"},
-            {"name": "Sparkpup",     "base_hp": 55, "min_level": 1, "max_level": 4,  "sprite_path": "menu_sprites/menusprite7.png"},
-            {"name": "Rufffang",     "base_hp": 70, "min_level": 2, "max_level": 6,  "sprite_path": "menu_sprites/menusprite8.png"},
-            {"name": "Blazewing",    "base_hp": 95, "min_level": 6, "max_level": 10, "sprite_path": "menu_sprites/menusprite9.png"},
-            {"name": "Nightmew",     "base_hp": 60, "min_level": 3, "max_level": 7,  "sprite_path": "menu_sprites/menusprite10.png"},
-            {"name": "Serpflare",    "base_hp": 75, "min_level": 4, "max_level": 8,  "sprite_path": "menu_sprites/menusprite11.png"},
-            {"name": "Aquabit",      "base_hp": 60, "min_level": 2, "max_level": 6,  "sprite_path": "menu_sprites/menusprite12.png"},
-            {"name": "Glidefin",     "base_hp": 65, "min_level": 2, "max_level": 6,  "sprite_path": "menu_sprites/menusprite13.png"},
-            {"name": "Seascale",     "base_hp": 90, "min_level": 5, "max_level": 9,  "sprite_path": "menu_sprites/menusprite14.png"},
-            {"name": "Sproutlet",    "base_hp": 45, "min_level": 1, "max_level": 3,  "sprite_path": "menu_sprites/menusprite15.png"},
-            {"name": "Flutterleaf",  "base_hp": 70, "min_level": 3, "max_level": 7,  "sprite_path": "menu_sprites/menusprite16.png"},
-        ]
+            {"name": "Bushmon",     "element": "grass", "base_hp": 60, "min_level": 2, "max_level": 5,  "sprite_path": "menu_sprites/menusprite1.png"},
+            {"name": "Leaflynx",    "element": "grass", "base_hp": 65, "min_level": 2, "max_level": 6,  "sprite_path": "menu_sprites/menusprite2.png"},
+            {"name": "Verdpuma",    "element": "grass", "base_hp": 75, "min_level": 3, "max_level": 7,  "sprite_path": "menu_sprites/menusprite3.png"},
+            {"name": "Sproutlet",   "element": "grass", "base_hp": 45, "min_level": 1, "max_level": 3,  "sprite_path": "menu_sprites/menusprite15.png"},
+            {"name": "Flutterleaf", "element": "grass", "base_hp": 70, "min_level": 3, "max_level": 7,  "sprite_path": "menu_sprites/menusprite16.png"},
+
+            {"name": "Blazewing",   "element": "fire",  "base_hp": 95, "min_level": 6, "max_level": 10, "sprite_path": "menu_sprites/menusprite9.png"},
+            {"name": "Serpflare",   "element": "fire",  "base_hp": 75, "min_level": 4, "max_level": 8,  "sprite_path": "menu_sprites/menusprite11.png"},
+            {"name": "Sparkpup",    "element": "fire",  "base_hp": 55, "min_level": 1, "max_level": 4,  "sprite_path": "menu_sprites/menusprite7.png"},
+
+
+            {"name": "Aquabit",     "element": "water", "base_hp": 60, "min_level": 2, "max_level": 6,  "sprite_path": "menu_sprites/menusprite12.png"},
+            {"name": "Glidefin",    "element": "water", "base_hp": 65, "min_level": 2, "max_level": 6,  "sprite_path": "menu_sprites/menusprite13.png"},
+            {"name": "Seascale",    "element": "water", "base_hp": 90, "min_level": 5, "max_level": 9,  "sprite_path": "menu_sprites/menusprite14.png"},
+            {"name": "Frostfox",    "element": "water", "base_hp": 70, "min_level": 3, "max_level": 7,  "sprite_path": "menu_sprites/menusprite6.png"},
+
+            {"name": "Nightmew",    "element": "grass",  "base_hp": 60, "min_level": 3, "max_level": 7,  "sprite_path": "menu_sprites/menusprite10.png"},
+            {"name": "Rufffang",    "element": "grass",  "base_hp": 70, "min_level": 2, "max_level": 6,  "sprite_path": "menu_sprites/menusprite8.png"},
+            {"name": "Brownbit",    "element": "grass","base_hp": 55, "min_level": 1, "max_level": 4,  "sprite_path": "menu_sprites/menusprite4.png"},
+            {"name": "Pebblip",     "element": "grass","base_hp": 50, "min_level": 1, "max_level": 4,  "sprite_path": "menu_sprites/menusprite5.png"},
+        ]      
+
         # ----------- MINIMAP -----------
         self.minimap_pos = (110, 20)     # top-left corner (below your back button)
         self.minimap_box = (220, 220)    # fixed UI box (frame size)
@@ -314,6 +323,30 @@ class GameScene(Scene):
         self._minimap_scale = 1.0
         self._minimap_inner_offset = (0, 0)  # letterbox offset inside the frame
 
+        monsters = getattr(self.game_manager.bag, "_monsters_data", [])
+        changed = False
+        for m in monsters:
+            if "element" not in m:
+                m["element"] = self._infer_element_by_name(m.get("name", ""))
+                changed = True
+        if changed:
+            self.game_manager.save("saves/game0.json")
+
+
+    def _get_element_icon(self, element: str) -> pg.Surface | None:
+        element = (element or "").lower()
+        if element in self.element_icon_cache:
+            return self.element_icon_cache[element]
+
+        path = f"assets/images/ingame_ui/{element}.png"
+        try:
+            img = pg.image.load(path).convert_alpha()
+            img = pg.transform.scale(img, (self.element_icon_size, self.element_icon_size))
+            self.element_icon_cache[element] = img
+            return img
+        except Exception:
+            self.element_icon_cache[element] = None
+            return None
 
 
     # ------------ open/close overlays -----------------
@@ -408,6 +441,17 @@ class GameScene(Scene):
                 q.append(nxt)
 
         return []
+    
+    def _infer_element_by_name(self, name: str) -> str:
+        # quick safe fallback
+        grass = {"Bushmon", "Leaflynx", "Verdpuma", "Sproutlet", "Flutterleaf"}
+        fire  = {"Blazewing", "Serpflare", "Sparkpup"}
+        water = {"Aquabit", "Glidefin", "Seascale", "Frostfox"}
+        if name in grass: return "grass"
+        if name in fire:  return "fire"
+        if name in water: return "water"
+        return "grass"
+
 
     def _update_nav_movement(self, dt: float) -> None:
         """Auto-move player along self.nav_path."""
@@ -547,12 +591,14 @@ class GameScene(Scene):
                 max_hp = template["base_hp"] + (level - 1) * 5
 
                 self.game_manager.pending_encounter = {
-                    "name": template["name"],
-                    "hp": max_hp,
-                    "max_hp": max_hp,
-                    "level": level,
-                    "sprite_path": template["sprite_path"],
+                "name": template["name"],
+                "element": template.get("element", "grass"),
+                "hp": max_hp,
+                "max_hp": max_hp,
+                "level": level,
+                "sprite_path": template["sprite_path"],
                 }
+
 
                 scene_manager.change_scene("catchpokemon", transition=True, duration=0.5)
                 return
@@ -677,6 +723,7 @@ class GameScene(Scene):
                     if self._spend_coins(price):
                         self._bag_add_item(name, 1, item.get("sprite_path", ""))
                         Logger.info(f"Bought {name} -${price}")
+                        self.game_manager.save("saves/game0.json")
                     else:
                         Logger.info("Not enough coins")
                 else:
@@ -684,6 +731,7 @@ class GameScene(Scene):
                     if self._bag_remove_item(name, 1):
                         self._add_coins(sell_price)
                         Logger.info(f"Sold {name} +${sell_price}")
+                        self.game_manager.save("saves/game0.json")
                 return
 
 
@@ -989,6 +1037,15 @@ class GameScene(Scene):
             hp_s = self.bag_small_font.render(f"HP {hp}/{max_hp}", True, (20, 20, 20))
             screen.blit(hp_s, (bar_x, bar_y + 11))
 
+            element = mon.get("element", "grass")
+            icon = self._get_element_icon(element)
+            if icon is not None:
+            # right edge, below hp bar (same line as HP text)
+                ix = left_x + banner_w - 26
+                iy = bar_y + 10
+                screen.blit(icon, (ix, iy))
+
+
             cur_y += card_h + card_gap
 
         # -------- RIGHT: item list with icons --------
@@ -1057,11 +1114,13 @@ class GameScene(Scene):
 
         new_mon = {
             "name": template["name"],
+            "element": template.get("element", "grass"),
             "hp": max_hp,
             "max_hp": max_hp,
             "level": level,
             "sprite_path": template["sprite_path"],
         }
+
 
         self.game_manager.bag._monsters_data.append(new_mon)
         Logger.info(f"Caught a wild {new_mon['name']}! Lv{new_mon['level']}")

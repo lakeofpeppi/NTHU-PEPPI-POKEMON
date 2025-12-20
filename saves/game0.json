@@ -15,8 +15,8 @@
         }
       ],
       "player": {
-        "x": 24,
-        "y": 24
+        "x": 25.0,
+        "y": 26.0
       },
       "enemy_trainers": [
         {
@@ -62,8 +62,8 @@
         }
       ],
       "player": {
-        "x": 12,
-        "y": 12
+        "x": 18.0,
+        "y": 7.0
       },
       "enemy_trainers": []
     },
@@ -95,23 +95,24 @@
   ],
   "current_map": "map.tmx",
   "player": {
-    "x": 26.11316015902517,
-    "y": 26.154306381072253
+    "x": 25.00000000000001,
+    "y": 26.616000000000042
   },
   "bag": {
     "monsters": [
       {
         "name": "Bushmon",
-        "hp": 60,
+        "hp": 35,
         "max_hp": 60,
-        "level": 3,
-        "sprite_path": "menu_sprites/menusprite1.png"
+        "level": 4,
+        "sprite_path": "menu_sprites/menusprite1.png",
+        "element": "grass"
       }
     ],
     "items": [
       {
         "name": "Potion",
-        "count": 3,
+        "count": 1,
         "sprite_path": "ingame_ui/potion.png"
       },
       {
@@ -120,9 +121,9 @@
         "sprite_path": "ingame_ui/coin.png"
       },
       {
-        "name": "Pokeball",
-        "count": 10,
-        "sprite_path": "ingame_ui/ball.png"
+        "name": "Max Potion",
+        "count": 1,
+        "sprite_path": "ingame_ui/maxpotion.png"
       }
     ]
   }
