@@ -598,9 +598,10 @@ class GameScene(Scene):
                 "level": level,
                 "sprite_path": template["sprite_path"],
                 }
-
+                #self.game_manager.save("saves/game0.json")
 
                 scene_manager.change_scene("catchpokemon", transition=True, duration=0.5)
+                self.game_manager.save("saves/game0.json")
                 return
 
 
@@ -1080,6 +1081,20 @@ class GameScene(Scene):
 
             cur_y += row_h
 
+    def _ensure_monster_elements(self) -> None:
+        monsters = getattr(self.game_manager.bag, "_monsters_data", [])
+        if not monsters:
+            return
+
+        name2elem = {m["name"]: m.get("element", "grass") for m in self.wild_pokemon_pool}
+        changed = False
+        for mon in monsters:
+            if not mon.get("element"):
+                mon["element"] = name2elem.get(mon.get("name", ""), "grass")
+                changed = True
+        if changed:
+            self.game_manager.save("saves/game0.json")
+
 
     # ---------------- save / load helpers ------------------
 
@@ -1123,6 +1138,7 @@ class GameScene(Scene):
 
 
         self.game_manager.bag._monsters_data.append(new_mon)
+        self.game_manager.save("saves/game0.json")
         Logger.info(f"Caught a wild {new_mon['name']}! Lv{new_mon['level']}")
 
         try:

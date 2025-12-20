@@ -100,6 +100,7 @@ class CatchPokemonScene(Scene):
         max_hp = 60 + 5 * lvl
         return {
             "name": "Bushmon",
+            "element": "grass",
             "level": lvl,
             "hp": max_hp,
             "max_hp": max_hp,
@@ -138,6 +139,8 @@ class CatchPokemonScene(Scene):
             bag.monsters.append(self.monster_data)
         elif hasattr(bag, "_monsters_data"):
             bag._monsters_data.append(self.monster_data)
+        
+        #self.game_manager.save("saves/game0.json")
 
     # ---------------------------------------------------------- button callbacks --
 

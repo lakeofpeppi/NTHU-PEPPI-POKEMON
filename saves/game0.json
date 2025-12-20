@@ -95,8 +95,8 @@
   ],
   "current_map": "map.tmx",
   "player": {
-    "x": 25.00000000000001,
-    "y": 26.616000000000042
+    "x": 27.993894803240256,
+    "y": 30.342170706323536
   },
   "bag": {
     "monsters": [
@@ -107,6 +107,14 @@
         "level": 4,
         "sprite_path": "menu_sprites/menusprite1.png",
         "element": "grass"
+      },
+      {
+        "name": "Serpflare",
+        "element": "fire",
+        "hp": 95,
+        "max_hp": 95,
+        "level": 5,
+        "sprite_path": "menu_sprites/menusprite11.png"
       }
     ],
     "items": [
