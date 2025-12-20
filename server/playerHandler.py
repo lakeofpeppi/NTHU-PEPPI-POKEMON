@@ -6,14 +6,6 @@ from typing import Dict
 TIMEOUT_TIME = 60.0
 CHECK_INTERVAL_TIME = 10.0
 
-"""
-TODO:
-In this file, you'll probably need to add more parameters for the direction change of other players.
-We recommend you not change any part unless there is a 'HINT' above it.
-"""
-
-# HINT: This class is used to store player information. Since you'll probably need to deal with direction, etc.
-# You can add other parameters if you need to.
 @dataclass
 class Player:
     id: int
@@ -22,14 +14,24 @@ class Player:
     map: str
     last_update: float
 
-    # HINT: This part might be helpful for direction change
-    # Maybe you can add other parameters? 
-    def update(self, x: float, y: float, map: str) -> None:
-        if x != self.x or y != self.y or map != self.map:
+    # NEW: direction + moving state (for animation)
+    dir: str = "down"        # "up"|"down"|"left"|"right"
+    moving: bool = False
+
+    def update(self, x: float, y: float, map: str, dir: str = "down", moving: bool = False) -> None:
+        # Update last_update if anything changes
+        if x != self.x or y != self.y or map != self.map or dir != self.dir or moving != self.moving:
             self.last_update = time.monotonic()
+
         self.x = x
         self.y = y
         self.map = map
+
+        # sanitize dir
+        if dir not in ("up", "down", "left", "right"):
+            dir = "down"
+        self.dir = dir
+        self.moving = bool(moving)
 
     def is_inactive(self) -> bool:
         now = time.monotonic()
@@ -40,7 +42,7 @@ class PlayerHandler:
     _lock: threading.Lock
     _stop_event: threading.Event
     _thread: threading.Thread | None
-    
+
     players: Dict[int, Player]
     _next_id: int
 
@@ -48,10 +50,10 @@ class PlayerHandler:
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._thread = None
-        
+
         self.players = {}
         self._next_id = 0
-        
+
     # Threading
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -75,46 +77,42 @@ class PlayerHandler:
                         to_remove.append(pid)
                 for pid in to_remove:
                     _ = self.players.pop(pid, None)
-                    
+
     # API
     def register(self) -> int:
         with self._lock:
             pid = self._next_id
             self._next_id += 1
-            # HINT: This part might be helpful for direction change
-            # Maybe you can add other parameters? 
-            self.players[pid] = Player(pid, 0.0, 0.0, "", time.monotonic())
+            self.players[pid] = Player(pid, 0.0, 0.0, "", time.monotonic(), dir="down", moving=False)
             return pid
 
     def unregister(self, pid: int) -> bool:
-        """Remove a player from the system"""
         with self._lock:
             if pid in self.players:
                 del self.players[pid]
                 return True
             return False
 
-    def update(self, pid: int, x: float, y: float, map_name: str) -> bool:
+    # NEW signature includes dir + moving
+    def update(self, pid: int, x: float, y: float, map_name: str, dir: str = "down", moving: bool = False) -> bool:
         with self._lock:
             p = self.players.get(pid)
             if not p:
                 return False
-            else:
-                # HINT: This part might be helpful for direction change
-                # Maybe you can add other parameters? 
-                p.update(float(x), float(y), str(map_name))
-                return True
+            p.update(float(x), float(y), str(map_name), str(dir), bool(moving))
+            return True
 
     def list_players(self) -> dict:
         with self._lock:
             player_list = {}
             for p in self.players.values():
-                # HINT: This part might be helpful for direction change
-                # Maybe you can add other parameters? 
                 player_list[p.id] = {
                     "id": p.id,
                     "x": p.x,
                     "y": p.y,
-                    "map": p.map
+                    "map": p.map,
+                    # NEW
+                    "dir": p.dir,
+                    "moving": p.moving,
                 }
             return player_list

@@ -13,6 +13,9 @@ class Player(Entity):
 
     def __init__(self, x: float, y: float, game_manager: GameManager) -> None:
         super().__init__(x, y, game_manager)
+        self.facing_dir = "down"
+        self.moving = False
+
 
     @override
     def update(self, dt: float) -> None:

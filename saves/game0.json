@@ -111,7 +111,7 @@
     "items": [
       {
         "name": "Potion",
-        "count": 5,
+        "count": 3,
         "sprite_path": "ingame_ui/potion.png"
       },
       {

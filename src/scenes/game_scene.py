@@ -11,6 +11,7 @@ from src.core.services import scene_manager, sound_manager
 from src.interface.components import Button, Slider, Checkbox
 from src.sprites import Sprite
 from typing import override
+from collections import deque
 
 class GameScene(Scene):
     game_manager: GameManager
@@ -41,7 +42,6 @@ class GameScene(Scene):
         self.game_manager = manager
 
 
-
         # -------- MINIMAP --------
         self.minimap_w = 180
         self.minimap_h = 180
@@ -56,7 +56,7 @@ class GameScene(Scene):
         self.shop_font = pg.font.Font("assets/fonts/Minecraft.ttf", 18)
         self.shop_small_font = pg.font.Font("assets/fonts/Minecraft.ttf", 14)
 
-        # NPC world position (PIXELS) - adjust to where you want the NPC to stand
+        # NPC world position (PIXELS)
         ts = GameSettings.TILE_SIZE
         self.shop_npc = ShopNPC(
             x=18 * ts,
@@ -64,12 +64,19 @@ class GameScene(Scene):
             game_manager=self.game_manager,
             facing=Direction.DOWN
         )
+
+        #NavigationOverlay
+        
         # shop items + prices
         self.shop_inventory = [
             {"name": "Potion",   "price": 5,  "sprite_path": "ingame_ui/potion.png"},
             {"name": "Pokeball", "price": 10, "sprite_path": "ingame_ui/ball.png"},
-            {"name": "Rare Candy","price": 50, "sprite_path": "ingame_ui/potion.png"},  # replace sprite if you have
-            {"name": "Max Potion","price": 30, "sprite_path": "ingame_ui/potion.png"},
+            {"name": "Rare Candy","price": 50, "sprite_path": "ingame_ui/candy.png"},  
+            {"name": "Max Potion","price": 30, "sprite_path": "ingame_ui/maxpotion.png"},
+            {"name": "Heal Potion",     "price": 5,  "sprite_path": "ingame_ui/options3.png"},
+            {"name": "Strength Potion", "price": 8,  "sprite_path": "ingame_ui/potions1.png"},
+            {"name": "Defense Potion",  "price": 8,  "sprite_path": "ingame_ui/options2"},
+
         ]
 
         # overlay layout
@@ -139,6 +146,7 @@ class GameScene(Scene):
             self._save_game
         )
 
+
         self.overlay_back_button = Button(
             "UI/button_back.png", "UI/button_back_hover.png",
             center_x + 10,          # right of center
@@ -188,7 +196,6 @@ class GameScene(Scene):
         # Load banner image for monster cards
         self.mon_banner_img = pg.image.load("assets/images/UI/raw/UI_Flat_Banner03a.png").convert_alpha()
 
-
         # Close button (top-right of panel)
         x_size = 48
         x_x = self.bag_panel_x + self.bag_panel_w - x_size - 14
@@ -205,6 +212,60 @@ class GameScene(Scene):
             "Coins": "ingame_ui/coin.png",
             "Pokeball": "ingame_ui/ball.png",
         }
+
+        # ---------------- NAVIGATION (Checkpoint 3) ----------------
+        self.nav_open = False
+        self.nav_moving = False
+        self.nav_path = deque()          # deque[(tx, ty)]
+        self.nav_target_name = None
+
+        # where the player should go (tile coords)
+        # IMPORTANT: change these to your real tile targets
+        self.nav_places = {
+            "gym":       {"map": self.game_manager.current_map.path_name, "tile": (24, 23)},
+            "home":      {"map": self.game_manager.current_map.path_name, "tile": (16, 29)},
+            "northpole": {"map": self.game_manager.current_map.path_name, "tile": (54, 14)},
+        }
+
+        # nav button below back button
+        nav_x = back_x
+        nav_y = back_y + 80 + 10   # 80 is back button size; +10 gap
+        self.nav_button = Button(
+            "UI/button_play.png", "UI/button_play_hover.png",   # use your own png
+        nav_x, nav_y, 80, 80,
+            self._open_nav
+        )
+
+        # overlay geometry
+        self.nav_panel_w, self.nav_panel_h = 500, 260
+        self.nav_panel_x = (GameSettings.SCREEN_WIDTH - self.nav_panel_w) // 2
+        self.nav_panel_y = (GameSettings.SCREEN_HEIGHT - self.nav_panel_h) // 2
+
+        # close button for overlay
+        self.nav_close_rect = pg.Rect(self.nav_panel_x + self.nav_panel_w - 56, self.nav_panel_y + 18, 40, 40)
+
+        # text
+        self.nav_font = pg.font.Font("assets/fonts/Minecraft.ttf", 22)
+        self.nav_small = pg.font.Font("assets/fonts/Minecraft.ttf", 14)
+
+        # three destination "cards" inside overlay (use your own png)
+        btn_size = 64
+        row_y = self.nav_panel_y + 90
+        gap = 30
+        start_x = self.nav_panel_x + 60
+
+        def mk_btn(place: str, x: int):
+            return Button(
+                "UI/raw/UI_Flat_Button02a_4.png", "UI/raw/UI_Flat_Button02a_1.png",  # your own png
+                x, row_y, btn_size, btn_size,
+                lambda p=place: self._start_navigation(p)
+            )
+
+        self.nav_gym_btn = mk_btn("gym", start_x)
+        self.nav_home_btn = mk_btn("home", start_x + btn_size + gap)
+        self.nav_np_btn = mk_btn("northpole", start_x + 2*(btn_size + gap))
+        # -----------------------------------------------------------
+
 
 
         # -----------  bush / catch button -----------
@@ -269,6 +330,131 @@ class GameScene(Scene):
     def _close_backpack(self) -> None:
         self.backpack_open = False
 
+    def _open_nav(self) -> None:
+        self.nav_open = True
+
+    def _close_nav(self) -> None:
+        self.nav_open = False
+
+    def _start_navigation(self, place: str) -> None:
+        if not self.game_manager.player:
+            return
+
+        info = self.nav_places.get(place)
+        if not info:
+            return
+
+        # If you later want cross-map navigation, handle it here.
+        cur_map = self.game_manager.current_map.path_name
+        if info["map"] != cur_map:
+            Logger.warning(f"Destination '{place}' is on another map: {info['map']}")
+            return
+
+        ts = GameSettings.TILE_SIZE
+        sx = int(self.game_manager.player.position.x // ts)
+        sy = int(self.game_manager.player.position.y // ts)
+        tx, ty = info["tile"]
+
+        path = self._bfs_path((sx, sy), (tx, ty))
+        if not path:
+            Logger.info(f"No path to {place}")
+            return
+
+        # path includes start; we want to move to next steps
+        self.nav_path = deque(path[1:])
+        self.nav_target_name = place
+        self.nav_moving = True
+        self.nav_open = False
+
+    def _is_walkable_tile(self, tx: int, ty: int) -> bool:
+        ts = GameSettings.TILE_SIZE
+
+        # map bounds from surface size
+        map_w, map_h = self.game_manager.current_map._surface.get_size()
+        max_tx = map_w // ts
+        max_ty = map_h // ts
+        if tx < 0 or ty < 0 or tx >= max_tx or ty >= max_ty:
+            return False
+
+        rect = pg.Rect(tx * ts, ty * ts, ts, ts)
+        return not self.game_manager.current_map.check_collision(rect)
+
+    def _bfs_path(self, start: tuple[int, int], goal: tuple[int, int]) -> list[tuple[int, int]]:
+        if start == goal:
+            return [start]
+
+        q = deque([start])
+        prev = {start: None}
+
+        while q:
+            x, y = q.popleft()
+            for dx, dy in ((1,0), (-1,0), (0,1), (0,-1)):
+                nx, ny = x + dx, y + dy
+                nxt = (nx, ny)
+                if nxt in prev:
+                    continue
+                if not self._is_walkable_tile(nx, ny):
+                    continue
+                prev[nxt] = (x, y)
+                if nxt == goal:
+                    # reconstruct
+                    path = [goal]
+                    cur = goal
+                    while prev[cur] is not None:
+                        cur = prev[cur]
+                        path.append(cur)
+                    path.reverse()
+                    return path
+                q.append(nxt)
+
+        return []
+
+    def _update_nav_movement(self, dt: float) -> None:
+        """Auto-move player along self.nav_path."""
+        p = self.game_manager.player
+        if p is None:
+            self.nav_moving = False
+            self.nav_path.clear()
+            return
+
+        if not self.nav_path:
+            self.nav_moving = False
+            return
+
+        ts = GameSettings.TILE_SIZE
+        next_tx, next_ty = self.nav_path[0]
+        target_x = next_tx * ts
+        target_y = next_ty * ts
+
+        # move towards target at player speed
+        speed = p.speed * dt
+        dx = target_x - p.position.x
+        dy = target_y - p.position.y
+
+        # choose axis-first to look grid-walk-y
+        if abs(dx) > 0.001:
+            step = max(-speed, min(speed, dx))
+            p.position.x += step
+        elif abs(dy) > 0.001:
+            step = max(-speed, min(speed, dy))
+            p.position.y += step
+
+        # snap when close enough (avoid floating drift)
+        if abs(p.position.x - target_x) < 0.5 and abs(p.position.y - target_y) < 0.5:
+            p.position.x = target_x
+            p.position.y = target_y
+            self.nav_path.popleft()
+        
+        p.animation.update_pos(p.position)
+        if abs(dx) > abs(dy):
+            p.animation.switch("right" if dx > 0 else "left")
+        else:
+            p.animation.switch("down" if dy > 0 else "up")
+
+        p.animation.update(dt)  
+
+
+
     @override
     def enter(self) -> None:
         sound_manager.play_bgm("longvideogame.ogg")
@@ -298,20 +484,50 @@ class GameScene(Scene):
             self._update_shop_overlay(dt)
             return
 
+        if self.nav_open:
+        # update overlay buttons
+            self.nav_gym_btn.update(dt)
+            self.nav_home_btn.update(dt)
+            self.nav_np_btn.update(dt)
+
+            # close by ESC or click X
+            if pg.key.get_pressed()[pg.K_ESCAPE]:
+                self._close_nav()
+                return
+
+            mouse_now = pg.mouse.get_pressed()[0]
+            click = mouse_now and (not self._mouse_prev)
+            self._mouse_prev = mouse_now
+            if click:
+                mx, my = pg.mouse.get_pos()
+                if self.nav_close_rect.collidepoint(mx, my):
+                    self._close_nav()
+                    return
+
+            return
+
 
         # Check if there is assigned next scene
         self.game_manager.try_switch_map()
         
         # Update player and other data
-        if self.game_manager.player:
-            self.game_manager.player.update(dt)
+        if self.nav_moving:
+            self._update_nav_movement(dt)
+        else:
+            if self.game_manager.player:
+                self.game_manager.player.update(dt)
+
+        
+
         for enemy in self.game_manager.current_enemy_trainers:
             enemy.update(dt)
             
         # Update others
         self.game_manager.bag.update(dt)
         # update shop npc (idle animation + near check)
-        self.shop_npc.update(dt)
+        if self.game_manager.current_map.path_name != "northpole.tmx" and self.game_manager.current_map.path_name != "map.tmx":
+            self.shop_npc.update(dt)
+
 
         # open shop when near + press SPACE
         if self.shop_npc.interact_pressed():
@@ -346,6 +562,8 @@ class GameScene(Scene):
         self.back_button.update(dt)
         self.overlay_button.update(dt)
         self.backpack_button.update(dt)
+        self.nav_button.update(dt)
+
 
         # ----------- NEW: detect bushes & update catch button -----------
         self.near_bush = False
@@ -474,6 +692,7 @@ class GameScene(Scene):
         if self.game_manager.player:
             # camera follow player
             player = self.game_manager.player
+            #print("MAP:", self.game_manager.current_map.path_name)
             map_surface = self.game_manager.current_map._surface  # pixel size of the whole map
             map_w, map_h = map_surface.get_size()
             cam_x = int(player.position.x - GameSettings.SCREEN_WIDTH  // 2)
@@ -506,6 +725,8 @@ class GameScene(Scene):
         self.back_button.draw(screen)
         self.overlay_button.draw(screen)
         self.backpack_button.draw(screen)
+        self.nav_button.draw(screen)
+
 
         # ----------- NEW: draw Catch button when near bush -----------
         if (not self.overlay_open) and (not self.backpack_open) and self.near_bush:
@@ -564,11 +785,52 @@ class GameScene(Scene):
             # Back button to close overlay
             self.overlay_back_button.draw(screen)
 
-        self.shop_npc.draw(screen, camera)
+        if self.game_manager.current_map.path_name != "northpole.tmx" and self.game_manager.current_map.path_name != "map.tmx":
+            self.shop_npc.draw(screen, camera)
+
         if self.backpack_open:
             self._draw_backpack_overlay(screen)
         if self.shop_open:
             self._draw_shop_overlay(screen)
+
+        if self.nav_open:
+            # dim background
+            dim = pg.Surface((GameSettings.SCREEN_WIDTH, GameSettings.SCREEN_HEIGHT), pg.SRCALPHA)
+            dim.fill((0, 0, 0, 150))
+            screen.blit(dim, (0, 0))
+
+            # panel
+            panel = pg.Rect(self.nav_panel_x, self.nav_panel_y, self.nav_panel_w, self.nav_panel_h)
+            pg.draw.rect(screen, (235, 160, 70), panel, border_radius=10)
+            pg.draw.rect(screen, (60, 35, 20), panel, 4, border_radius=10)
+
+            # title
+            title = self.nav_font.render("Navigate To", True, (0, 0, 0))
+            screen.blit(title, (panel.centerx - title.get_width()//2, panel.y + 18))
+
+            # close X
+            pg.draw.rect(screen, (250, 235, 200), self.nav_close_rect, border_radius=6)
+            pg.draw.rect(screen, (0, 0, 0), self.nav_close_rect, 2, border_radius=6)
+            x_t = self.nav_font.render("X", True, (0, 0, 0))
+            screen.blit(x_t, (self.nav_close_rect.centerx - x_t.get_width()//2,
+                      self.nav_close_rect.centery - x_t.get_height()//2))
+
+            # buttons
+            self.nav_gym_btn.draw(screen)
+            self.nav_home_btn.draw(screen)
+            self.nav_np_btn.draw(screen)
+
+            # labels under buttons
+            def label_under(btn: Button, text: str):
+                t = self.nav_small.render(text, True, (0, 0, 0))
+                bx = btn.hitbox.centerx - t.get_width()//2
+                by = btn.hitbox.bottom + 8
+                screen.blit(t, (bx, by))
+
+            label_under(self.nav_gym_btn, "gym")
+            label_under(self.nav_home_btn, "home")
+            label_under(self.nav_np_btn, "northpole")
+        
 
 
     
@@ -921,3 +1183,4 @@ class GameScene(Scene):
 
             screen.blit(act_t, (action_rect.centerx - act_t.get_width()//2,
                             action_rect.centery - act_t.get_height()//2))
+            

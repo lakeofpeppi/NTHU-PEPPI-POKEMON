@@ -64,6 +64,13 @@ class EnemyTrainer(Entity):
 
         # if player is in front & presses SPACE, go to battle scene
         if self.detected and input_manager.key_pressed(pygame.K_SPACE):
+            # store who we're fighting (can be based on trainer position)
+            self.game_manager.pending_battle = {
+                "trainer_pos": (float(self.position.x), float(self.position.y)),
+                "trainer_facing": self.los_direction.name,
+        
+            }
+            scene_manager.change_scene("battle")
             scene_manager.change_scene("battle")
 
         self.animation.update_pos(self.position)
