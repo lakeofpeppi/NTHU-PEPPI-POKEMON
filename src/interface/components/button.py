@@ -105,6 +105,7 @@ def main():
             if event.type == pg.QUIT:
                 running = False
             input_manager.handle_events(event)
+            
         
         dt = clock.tick(60) / 1000.0
         button.update(dt)

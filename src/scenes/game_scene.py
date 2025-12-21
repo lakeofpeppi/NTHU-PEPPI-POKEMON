@@ -52,7 +52,7 @@ class GameScene(Scene):
         self.minimap_w = 180
         self.minimap_h = 180
         self.minimap_x = 20
-        self.minimap_y = 110   # below your back button (back button is at y=20)
+        self.minimap_y = 110   
 
         self._minimap_cached = None
         self._minimap_cached_key = None  # cache per-map
@@ -230,7 +230,7 @@ class GameScene(Scene):
         self.nav_target_name = None
 
         # where the player should go (tile coords)
-        # IMPORTANT: change these to your real tile targets
+        
         self.nav_places = {
             "gym":       {"map": "map.tmx", "tile": (24, 23)},
             "home":      {"map": "map.tmx", "tile": (16, 29)},
@@ -241,7 +241,7 @@ class GameScene(Scene):
         nav_x = back_x
         nav_y = back_y + 80 + 10   # 80 is back button size; +10 gap
         self.nav_button = Button(
-            "UI/button_play.png", "UI/button_play_hover.png",   # use your own png
+            "UI/button_play.png", "UI/button_play_hover.png",   
         nav_x, nav_y, 80, 80,
             self._open_nav
         )
@@ -258,7 +258,7 @@ class GameScene(Scene):
         self.nav_font = pg.font.Font("assets/fonts/Minecraft.ttf", 22)
         self.nav_small = pg.font.Font("assets/fonts/Minecraft.ttf", 14)
 
-        # three destination "cards" inside overlay (use your own png)
+        
         btn_size = 64
         row_y = self.nav_panel_y + 90
         gap = 30
@@ -266,7 +266,7 @@ class GameScene(Scene):
 
         def mk_btn(place: str, x: int):
             return Button(
-                "UI/raw/UI_Flat_Button02a_4.png", "UI/raw/UI_Flat_Button02a_1.png",  # your own png
+                "UI/raw/UI_Flat_Button02a_4.png", "UI/raw/UI_Flat_Button02a_1.png",  
                 x, row_y, btn_size, btn_size,
                 lambda p=place: self._start_navigation(p)
             )
@@ -288,8 +288,8 @@ class GameScene(Scene):
 
         
         self.catch_button = Button(
-            "UI/raw/UI_Flat_ToggleOff01a.png",        # TODO: replace with your asset
-            "UI/raw/UI_Flat_ToggleOff02a.png",  # TODO: replace with your asset
+            "UI/raw/UI_Flat_ToggleOff01a.png",     
+            "UI/raw/UI_Flat_ToggleOff02a.png",  #
             catch_x, catch_y, catch_w, catch_h,
             self._catch_pokemon
         )
@@ -322,7 +322,7 @@ class GameScene(Scene):
         ]      
 
         # ----------- MINIMAP -----------
-        self.minimap_pos = (110, 20)     # top-left corner (below your back button)
+        self.minimap_pos = (110, 20)     
         self.minimap_box = (220, 220)    # fixed UI box (frame size)
         self._minimap_cache_map_id = None
         self._minimap_map_surf = None    # scaled map image (keeps aspect ratio)
@@ -374,6 +374,11 @@ class GameScene(Scene):
 
     def _close_nav(self) -> None:
         self.nav_open = False
+
+    @property
+    def current_scene(self) -> Scene | None:
+        return self._current_scene
+
 
     def _start_navigation(self, place: str) -> None:
         if not self.game_manager.player:
@@ -675,11 +680,24 @@ class GameScene(Scene):
         if self.online_manager is None:
             return
 
+        '''
+        if event.type == pg.KEYDOWN:
+            print("KEY:", event.key)
+
+        if event.type == pg.KEYDOWN and event.key == pg.K_r:
+            print(" pressed in GameScene")
+        '''
+
         # Open chat with T (only when no other overlay is open)
-        if event.type == pg.KEYDOWN and event.key == pg.K_t:
+        if event.type == pg.KEYDOWN and event.key == pg.K_r and (event.mod & pg.KMOD_SHIFT):
             if (not self.overlay_open) and (not self.backpack_open) and (not self.shop_open) and (not self.nav_open):
-                self.chat_open = True
-                self.chat_overlay.open()
+                if self.chat_open:
+                    self.chat_open = False
+                    self.chat_overlay.close()
+                else:
+                    self.chat_open = True
+                    self.chat_overlay.open()
+        
             return
 
         # If chat is open, it consumes typing and blocks gameplay controls
@@ -692,6 +710,22 @@ class GameScene(Scene):
                 self.chat_open = False
             return
 
+    def _get_my_id(self) -> str | None:
+        om = self.online_manager
+        if om is None:
+            return None
+        for attr in ("id", "player_id", "_id", "_player_id"):
+            if hasattr(om, attr):
+                v = getattr(om, attr)
+                if v is not None:
+                    return str(v)
+        # optional method names
+        for fn in ("get_id", "get_player_id"):
+            if hasattr(om, fn):
+                v = getattr(om, fn)()
+                if v is not None:
+                    return str(v)
+        return None
 
     
     def _bag_get_count(self, item_name: str) -> int:
@@ -851,6 +885,7 @@ class GameScene(Scene):
         self.nav_button.draw(screen)
 
 
+
         # ----------- NEW: draw Catch button when near bush -----------
         if (not self.overlay_open) and (not self.backpack_open) and self.near_bush:
             self.catch_button.draw(screen)
@@ -953,16 +988,55 @@ class GameScene(Scene):
             label_under(self.nav_gym_btn, "gym")
             label_under(self.nav_home_btn, "home")
             label_under(self.nav_np_btn, "northpole")
+        
+        if self.online_manager is not None:
+            msgs = self.online_manager.get_recent_chat(50)
+            self.chat_overlay.draw(screen, msgs, show_when_closed=True)
 
+        '''
         if self.online_manager:
             n = len(self.online_manager.get_list_players())
             txt = self.bag_small_font.render(f"REMOTE: {n}", True, (255,255,255))
             screen.blit(txt, (20, 20))
+        '''
+
+        if self.online_manager:
+            msgs = self.online_manager.get_recent_chat(50)
+
+            # build id->name map (at least self)
+            id2name = {}
+            my_id = self._get_my_id()
+            if my_id is not None:
+                id2name[my_id] = GameSettings.PLAYER_NAME
+
+            # OPTIONAL: if server returns names in player list
+            # (only works if get_list_players() contains "name")
+            try:
+                for p in self.online_manager.get_list_players():
+                    pid = str(p.get("id", ""))
+                    pname = p.get("name")
+                    if pid and pname:
+                        id2name[pid] = pname
+            except Exception:
+                pass
+
+            # rewrite messages so ChatOverlay prints names
+            fixed = []
+            for m in msgs:
+                mm = dict(m)
+                sid = str(mm.get("from") or mm.get("id") or "")
+                if sid in id2name:
+                    mm["name"] = id2name[sid]
+                fixed.append(mm)
+
+            self.chat_overlay.draw(screen, fixed)
 
 
         if self.chat_open and self.online_manager is not None:
             msgs = self.online_manager.get_recent_chat(50)
             self.chat_overlay.draw(screen, msgs)
+
+        
 
         
         
@@ -1293,7 +1367,7 @@ class GameScene(Scene):
         if self.shop_tab == "buy":
             data = self.shop_inventory
         else:
-            # sell shows your bag items (except Coins)
+            
             data = [it for it in getattr(self.game_manager.bag, "_items_data", []) if it.get("name") != "Coins"]
 
         for idx, it in enumerate(data[:max_rows]):

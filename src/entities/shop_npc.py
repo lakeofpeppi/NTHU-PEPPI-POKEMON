@@ -18,10 +18,10 @@ class ShopNPC(Entity):
         # call base Entity to set position/game_manager
         super().__init__(x, y, game_manager)
 
-        # OVERRIDE animation to your shop girl spritesheet
+       
         self.animation = Animation(
             "character/ow3.png",                 # <-- put ow3.png into assets/images/character/ow3.png
-            ["down", "left", "right", "up"],     # must match your sheet row order
+            ["down", "left", "right", "up"],     
             4,                                   # columns (frames per row)
             (GameSettings.TILE_SIZE, GameSettings.TILE_SIZE),
             loop=0.8                             # speed (smaller = faster)

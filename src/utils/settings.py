@@ -3,6 +3,7 @@ from dataclasses import dataclass
 @dataclass
 class Settings:
     # Screen
+    PLAYER_NAME = "Player"
     SCREEN_WIDTH: int = 1280    # Width of the game window
     SCREEN_HEIGHT: int = 720    # Height of the game window
     FPS: int = 60               # Frames per second

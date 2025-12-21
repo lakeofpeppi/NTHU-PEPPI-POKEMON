@@ -58,6 +58,7 @@ class Engine:
                 self.running = False
             input_manager.handle_events(event)
             scene_manager.handle_event(event)
+            #current_scene.handle_event(event)
             
 
     def update(self, dt: float):

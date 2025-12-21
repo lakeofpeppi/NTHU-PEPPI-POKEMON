@@ -1,6 +1,7 @@
 import pygame as pg
 import math
 
+from src.interface.name_overlay import NameOverlay
 from src.utils import GameSettings
 from src.sprites import BackgroundSprite
 from src.scenes.scene import Scene
@@ -28,6 +29,10 @@ class MenuScene(Scene):
     def __init__(self):
         super().__init__()
         self.background = BackgroundSprite("backgrounds/background1.png")
+
+        self.name_overlay = NameOverlay()
+        self.name_done = False
+
 
         px, py = GameSettings.SCREEN_WIDTH // 2, GameSettings.SCREEN_HEIGHT * 3 // 4
         self.play_button = Button(
@@ -79,10 +84,28 @@ class MenuScene(Scene):
         self.wildwood_base_center = self.wildwood_rect.center
 
 
+    @override
+    def handle_event(self, event: pg.event.Event) -> None:
+        # If name prompt not finished, it consumes all input
+        if not self.name_done and self.name_overlay.opened:
+            name = self.name_overlay.handle_event(event)
+            if name is not None:
+                GameSettings.PLAYER_NAME = name
+                self.name_done = True
+                self.name_overlay.close()
+            return
+
+
         
     @override
     def enter(self) -> None:
         sound_manager.play_bgm("oldvideogame.ogg")
+        if GameSettings.PLAYER_NAME and GameSettings.PLAYER_NAME != "Player":
+            self.name_done = True
+            self.name_overlay.close()
+        else:
+            self.name_done = False
+            self.name_overlay.open()
         #pass
 
 
@@ -93,6 +116,8 @@ class MenuScene(Scene):
     @override
     def update(self, dt: float) -> None:
         self.title_t += dt
+        if not self.name_done:
+            return
         if input_manager.key_pressed(pg.K_SPACE):
             scene_manager.change_scene("game")
             return
@@ -140,3 +165,9 @@ class MenuScene(Scene):
     # buttons
         self.play_button.draw(screen)
         self.setting_button.draw(screen)
+
+        if not self.name_done:
+            ox = (GameSettings.SCREEN_WIDTH - self.name_overlay.width) // 2
+            oy = wildwood_rect.bottom + 25   # spacing under Wildwood
+            self.name_overlay.draw(screen, ox, oy)
+

@@ -207,6 +207,7 @@ class OnlineManager:
 
             elif msg_type == "chat_update":
                 messages = data.get("messages", [])
+                Logger.info(f"CHAT_UPDATE received: {len(messages)}")
                 with self._lock:
                     for m in messages:
                         self._chat_messages.append(m)

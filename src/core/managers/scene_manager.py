@@ -121,10 +121,13 @@ class SceneManager:
         # If transitioning, optionally forward to transition scene (usually you ignore input)
         if self._transition is not None:
             return
-
+        if event.type == pg.KEYDOWN:
+            print("SceneManager got KEYDOWN:", event.key)
         if self._current_scene:
-         self._current_scene.handle_event(event)
+            self._current_scene.handle_event(event)
     
+    def get_current_scene(self) -> Scene | None:
+        return self._current_scene
 
     def update(self, dt: float) -> None:
         # 1) Handle normal scene switch

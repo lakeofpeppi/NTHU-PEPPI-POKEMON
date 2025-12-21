@@ -239,7 +239,7 @@ class BattleScene(Scene):
 
     def _use_heal_potion(self):
         if self._bag_remove("Heal Potion", 1):
-            self.player_mon.heal(20)   # pick your heal amount
+            self.player_mon.heal(20)   
 
     def _use_strength_potion(self):
         if self._bag_remove("Strength Potion", 1):
@@ -894,7 +894,7 @@ class BattleScene(Scene):
 
         self._item_use_buttons = []
 
-        # layout (match your overlay list)
+        
         x, y, w, h = self.item_panel_x, self.item_panel_y, self.item_panel_w, self.item_panel_h
         list_x = x + 40
         list_y = y + 100
@@ -911,7 +911,7 @@ class BattleScene(Scene):
             btn_x = row_rect.right - use_w - 16
             btn_y = ry + (row_h - use_h) // 2
 
-            # create a hover button like your UI style
+            
             b = Button(
                 "UI/raw/UI_Flat_Button02a_4.png",   # normal
                 "UI/raw/UI_Flat_Button02a_1.png",   # hover
